@@ -13,23 +13,14 @@ const _jetbrainsMono = JetBrains_Mono({ subsets: ["latin"] });
 export const metadata: Metadata = {
   title: 'AI Loan Underwriting Copilot',
   description: 'AI Loan Underwriting Copilot - AI Insights & Application Pipeline Management',
-
   icons: {
     icon: [
-      {
-        url: '/icon-light-32x32.png?v=5',
-        media: '(prefers-color-scheme: light)',
-      },
-      {
-        url: '/icon-dark-32x32.png?v=5',
-        media: '(prefers-color-scheme: dark)',
-      },
-      {
-        url: '/icon.svg?v=5',
-        type: 'image/svg+xml',
-      },
+      { url: '/favicon.ico', sizes: '32x32' },
+      { url: '/icon-light-32x32.png?v=6', media: '(prefers-color-scheme: light)' },
+      { url: '/icon-dark-32x32.png?v=6', media: '(prefers-color-scheme: dark)' },
+      { url: '/icon.svg?v=6', type: 'image/svg+xml' },
     ],
-    apple: '/apple-icon.png?v=5',
+    apple: '/apple-icon.png?v=6',
   },
 }
 
