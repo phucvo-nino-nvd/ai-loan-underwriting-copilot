@@ -1,0 +1,22 @@
+# Python virtual environment
+swin_2026/
+
+# Python bytecode
+__pycache__/
+*.py[cod]
+*.so
+
+# build / dist
+*.egg-info/
+*.egg
+dist/
+build/
+vector_db/
+memory
+
+# macOS
+.DS_Store
+
+# env
+.env
+.env.local
