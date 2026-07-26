@@ -14,18 +14,16 @@ interface Message {
 
 /**
  * Chat surface, scoped by whatever context the caller passes — an assessment in the workspace,
- * the portfolio on the AI Assistant page. Falls back to `mockReply` when the backend is absent.
+ * the portfolio on the AI Assistant page.
  */
 export function AiAssistant({
   greeting,
   context,
   suggestions,
-  mockReply,
 }: {
   greeting: string;
   context: string;
   suggestions: string[];
-  mockReply: (question: string) => string;
 }) {
   const api = useApi();
   const [messages, setMessages] = useState<Message[]>([{ id: 0, role: "assistant", text: greeting }]);
@@ -42,7 +40,7 @@ export function AiAssistant({
       const raw = localStorage.getItem("swin_settings");
       if (raw) {
         const data = JSON.parse(raw);
-        if (!data?.aiConfig?.geminiKey && !data?.aiConfig?.nvidiaKey) {
+        if (!data?.aiConfig?.nvidiaKey) {
           setHasKey(false);
         }
       } else {
@@ -63,7 +61,7 @@ export function AiAssistant({
         <Key className="w-10 h-10 mb-4 text-muted-foreground" />
         <h3 className="text-base font-semibold text-foreground tracking-tight">API Key Required</h3>
         <p className="text-sm text-muted-foreground mt-2 max-w-sm leading-relaxed">
-          Please configure an AI Provider (Gemini or NVIDIA) to use the Assistant. 
+           Please configure an NVIDIA API Key to use the Assistant. 
           Your keys are stored securely in your browser.
         </p>
         <p className="text-xs font-bold font-mono uppercase tracking-widest text-accent mt-6">
@@ -98,9 +96,9 @@ export function AiAssistant({
           return [...prev, { id: replyId, role: "assistant", text: event.chunk }];
         });
       }
-    } catch {
-      await new Promise((r) => setTimeout(r, 600));
-      setMessages((prev) => [...prev, { id: replyId, role: "assistant", text: mockReply(question) }]);
+    } catch (e) {
+      const errMsg = e instanceof Error ? e.message : "Failed to get response from AI. Please try again.";
+      setMessages((prev) => [...prev, { id: replyId, role: "assistant", text: `Error: ${errMsg}` }]);
     } finally {
       setIsTyping(false);
     }

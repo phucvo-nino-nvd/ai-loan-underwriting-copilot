@@ -13,10 +13,8 @@ export default function OnboardingPage() {
   const [lastName, setLastName] = useState("");
   const [role, setRole] = useState("analyst");
   const [timezone, setTimezone] = useState("utc");
-  const [provider, setProvider] = useState("gemini-2.5-flash-lite");
-  const [geminiKey, setGeminiKey] = useState("");
+  const [provider, setProvider] = useState("openai/gpt-oss-120b");
   const [nvidiaKey, setNvidiaKey] = useState("");
-  const [showGeminiKey, setShowGeminiKey] = useState(false);
   const [showNvidiaKey, setShowNvidiaKey] = useState(false);
   const [saving, setSaving] = useState(false);
   const [submitError, setSubmitError] = useState("");
@@ -50,7 +48,6 @@ export default function OnboardingPage() {
       }
       if (!settings.aiConfig) settings.aiConfig = {};
       settings.aiConfig.preferredModel = provider;
-      if (geminiKey) settings.aiConfig.geminiKey = geminiKey;
       if (nvidiaKey) settings.aiConfig.nvidiaKey = nvidiaKey;
       localStorage.setItem("swin_settings", JSON.stringify(settings));
 
@@ -151,38 +148,14 @@ export default function OnboardingPage() {
             <div className="space-y-4">
               <div className="space-y-2">
                 <label htmlFor="provider" className="text-sm font-medium text-foreground">AI Provider</label>
-                <select
-                  id="provider"
-                  value={provider}
-                  onChange={(e) => setProvider(e.target.value)}
-                  className="w-full h-9 px-3 rounded-lg bg-secondary border border-border text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring/20 focus:border-accent transition-all duration-200"
-                >
-                  <option value="gemini-2.5-flash-lite">Gemini 2.5 Flash Lite</option>
-                  <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
-                  <option value="google/diffusiongemma-26b-a4b-it">NVIDIA DiffusionGemma</option>
-                </select>
-              </div>
-
-              <div className="space-y-2">
-                <label htmlFor="geminiKey" className="text-sm font-medium text-foreground">Gemini API Key</label>
-                <div className="relative">
-                  <input
-                    id="geminiKey"
-                    type={showGeminiKey ? "text" : "password"}
-                    value={geminiKey}
-                    onChange={(e) => setGeminiKey(e.target.value)}
-                    placeholder="AIza… (optional)"
-                    className="w-full h-9 px-3 pr-10 rounded-lg bg-secondary border border-border text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring/20 focus:border-accent transition-all duration-200"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowGeminiKey(!showGeminiKey)}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
-                    tabIndex={-1}
+                  <select
+                    id="provider"
+                    value={provider}
+                    onChange={(e) => setProvider(e.target.value)}
+                    className="w-full h-9 px-3 rounded-lg bg-secondary border border-border text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring/20 focus:border-accent transition-all duration-200"
                   >
-                    {showGeminiKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                  </button>
-                </div>
+                    <option value="openai/gpt-oss-120b">NVIDIA openai-oss-120b</option>
+                  </select>
               </div>
 
               <div className="space-y-2">

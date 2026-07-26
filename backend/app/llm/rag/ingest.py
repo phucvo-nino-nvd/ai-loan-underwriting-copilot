@@ -14,7 +14,7 @@ KNOWLEDGE_BASE = str(Path(__file__).parent / "knowledge_base")
 load_dotenv(dotenv_path=Path(__file__).parent.parent.parent.parent / ".env.local", override=True)
 
 embeddings = NVIDIAEmbeddings(
-    model="nvidia/nv-embedqa-e5-v5", api_key=os.getenv("NVDIA_API_KEY")
+    model="nvidia/nv-embedqa-e5-v5", api_key=os.getenv("NVIDIA_API_KEY")
 )
 
 

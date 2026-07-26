@@ -1,5 +1,6 @@
 import os
 from pathlib import Path
+from contextlib import asynccontextmanager
 
 from dotenv import load_dotenv
 from fastapi import FastAPI
@@ -8,8 +9,21 @@ from fastapi.middleware.cors import CORSMiddleware
 load_dotenv(Path(__file__).resolve().parents[1] / ".env.local", override=True)
 
 from .routes import policy, predict, report, rag
+from .llm.mcp_server import McpSessions, mcp_connections, set_mcp_tools
 
-app = FastAPI(title="Credit Risk API")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    connections = mcp_connections()
+    sessions = McpSessions(connections)
+    tools = await sessions.start()
+    set_mcp_tools(tools)
+    app.state.mcp_sessions = sessions
+    yield
+    sessions.stop()
+
+
+app = FastAPI(title="Credit Risk API", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,

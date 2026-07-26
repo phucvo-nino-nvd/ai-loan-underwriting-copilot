@@ -239,47 +239,6 @@ export function ApplicantWorkspace({
             "Why is the PD this high?",
             "Which factors could be mitigated?",
           ]}
-          mockReply={(q) => {
-            const top = assessment.top_features[0];
-            const dti = applicant ? (applicant.loan_amount / applicant.income).toFixed(1) : "—";
-            if (/write.*report|report/i.test(q) && !/why|what|which/i.test(q)) {
-              const pd = (assessment.probability * 100).toFixed(2);
-              const [first, second] = assessment.top_features;
-              return (
-                `Underwriting Summary — ${assessment.applicantName} (${assessment.applicantId})\n\n` +
-                `The ensemble model scores this application at a ${pd}% probability of default, placing it in the ${assessment.risk_band} risk band.\n\n` +
-                `Primary driver: ${first.feature} at ${formatValue(first.value)}, contributing ` +
-                `${first.shap_value >= 0 ? "+" : "−"}${Math.abs(first.shap_value).toFixed(3)} to the score. ` +
-                `Secondary driver: ${second.feature} (${formatValue(second.value)}).\n\n` +
-                `Affordability: the requested facility of ${applicant ? formatMoney(applicant.loan_amount) : "—"} against declared income of ` +
-                `${applicant ? formatMoney(applicant.income) : "—"} gives a ${dti}× exposure ratio. Employment is recorded as ` +
-                `${applicant?.employment ?? "unknown"}.\n\n` +
-                `Concerns and mitigants are set out in the SHAP panel above; the policy clauses this file triggers are listed below. ` +
-                `This report is decision-support only.`
-              );
-            }
-            if (/recommend|decision/i.test(q) && !/why|what|which/i.test(q)) {
-              const pd = (assessment.probability * 100).toFixed(2);
-              const call = assessment.risk_band === "LOW" ? "Approve" : assessment.risk_band === "MEDIUM" ? "Approve with conditions" : "Refer to manual underwriting";
-              const highRisk = assessment.risk_band === "HIGH" || assessment.risk_band === "VERY HIGH";
-              return (
-                `Recommendation: ${call}.\n\n` +
-                `The model returns a ${pd}% probability of default (${assessment.risk_band}). Exposure is ${dti}× gross annual income ` +
-                `on ${applicant?.employment.toLowerCase() ?? "unverified"} employment.\n\n` +
-                `Conditions:\n` +
-                `• Verify income with three months of statements before drawdown.\n` +
-                `• ${assessment.risk_band === "LOW" ? "Standard pricing applies." : "Apply risk-based pricing uplift and cap the term at 60 months."}\n` +
-                `• ${highRisk ? "Policy CRD-019 requires manual referral — auto-decline is not permitted." : "No referral trigger under CRD-019."}\n\n` +
-                `This recommendation is advisory. The underwriter of record owns the decision (CRD-023).`
-              );
-            }
-            if (/polic/i.test(q)) return relevant.map((p) => `${p.id} — ${p.title}: ${p.body}`).join("\n\n");
-            if (/mitigat|reduce|improve/i.test(q))
-              return `The strongest downward levers on this file are a smaller facility and verified income. Cutting the loan by 15% moves ${top.feature} materially, and evidencing ${applicant?.employment.toLowerCase() ?? "employment"} income over 24 months offsets the employment penalty (CRD-011).`;
-            if (/afford|income|dti/i.test(q))
-              return `Requested ${applicant ? formatMoney(applicant.loan_amount) : "—"} against ${applicant ? formatMoney(applicant.income) : "—"} income — ${dti}× exposure. ${applicant && applicant.loan_amount / applicant.income > 4 ? "That breaches the 4.0× threshold in CRD-004 and needs senior credit sign-off." : "That sits inside the 4.0× threshold in CRD-004."}`;
-            return `PD is ${(assessment.probability * 100).toFixed(2)}% (${assessment.risk_band}). The dominant contributor is ${top.feature} at ${formatValue(top.value)}, adding ${top.shap_value >= 0 ? "+" : "−"}${Math.abs(top.shap_value).toFixed(3)} to the score.`;
-          }}
         />
       </Section>
 

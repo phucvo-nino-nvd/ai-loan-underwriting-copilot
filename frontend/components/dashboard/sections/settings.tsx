@@ -69,7 +69,6 @@ interface AppSettings {
   profile: ProfileSettings;
   aiConfig: {
     preferredModel: string;
-    geminiKey: string;
     nvidiaKey: string;
     temperature: number;
     maxTokens: number;
@@ -100,8 +99,7 @@ function defaultSettings(userName?: string, userEmail?: string): AppSettings {
       avatarUrl: "",
     },
     aiConfig: {
-      preferredModel: "gemini-2.5-flash-lite",
-      geminiKey: "",
+      preferredModel: "openai/gpt-oss-120b",
       nvidiaKey: "",
       temperature: 0.7,
       maxTokens: 2048,
@@ -311,7 +309,6 @@ export function SettingsSection({
     loadSettings(userName, userEmail)
   );
   const [activeTab, setActiveTab] = useState("profile");
-  const [showGeminiKey, setShowGeminiKey] = useState(false);
   const [showNvidiaKey, setShowNvidiaKey] = useState(false);
 
   // Persist on every change & notify sidebar
@@ -864,9 +861,7 @@ export function SettingsSection({
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="gemini-2.5-flash-lite">Gemini 2.5 Flash Lite</SelectItem>
-                    <SelectItem value="gemini-2.5-flash">Gemini 2.5 Flash</SelectItem>
-                    <SelectItem value="google/diffusiongemma-26b-a4b-it">NVIDIA DiffusionGemma</SelectItem>
+                    <SelectItem value="openai/gpt-oss-120b">NVIDIA openai-oss-120b</SelectItem>
                   </SelectContent>
                 </Select>
                 <p className="text-xs text-muted-foreground mt-1">
@@ -882,42 +877,6 @@ export function SettingsSection({
                   <p className="text-xs text-muted-foreground mb-4">
                     API keys are stored locally and never sent to our servers.
                   </p>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="geminiKey">Gemini API Key</Label>
-                  <div className="flex gap-2 max-w-md">
-                    <div className="relative flex-1">
-                      <Input
-                        id="geminiKey"
-                        type={showGeminiKey ? "text" : "password"}
-                        value={settings.aiConfig.geminiKey}
-                        onChange={(e) => updateAiConfig({ geminiKey: e.target.value })}
-                        placeholder="AIza…"
-                        className="bg-secondary border-border focus:border-accent pr-10"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setShowGeminiKey(!showGeminiKey)}
-                        className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
-                      >
-                        {showGeminiKey ? (
-                          <EyeOff className="w-4 h-4" />
-                        ) : (
-                          <Eye className="w-4 h-4" />
-                        )}
-                      </button>
-                    </div>
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      className="shrink-0"
-                      onClick={() => handleCopyApiKey(settings.aiConfig.geminiKey, "Gemini API key")}
-                      disabled={!settings.aiConfig.geminiKey}
-                    >
-                      <Copy className="w-4 h-4" />
-                    </Button>
-                  </div>
                 </div>
 
                 <div className="space-y-2">

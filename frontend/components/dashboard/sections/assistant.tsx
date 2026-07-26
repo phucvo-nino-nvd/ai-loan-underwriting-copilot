@@ -60,25 +60,6 @@ export function AssistantSection({
             "Explain the bank's DTI policy",
             "How many applications are still unassessed?",
           ]}
-          mockReply={(q) => {
-            if (/dti|debt.to.income|policy|polic/i.test(q))
-              return policies.map((p) => `${p.id} — ${p.title}: ${p.body}`).join("\n\n");
-            if (/today|summar/i.test(q))
-              return today.length
-                ? `${today.length} assessment${today.length === 1 ? "" : "s"} completed today, average PD ${(
-                    (today.reduce((acc, a) => acc + a.probability, 0) / today.length) * 100
-                  ).toFixed(2)}%:\n\n${today.map(pdLine).join("\n")}`
-                : "No assessments have been completed today yet. Run one from the Applicants page.";
-            if (/unassessed|not assessed|pending|queue/i.test(q)) {
-              const pending = applicants.filter((a) => a.status === "Not Assessed");
-              return `${pending.length} applicant${pending.length === 1 ? "" : "s"} awaiting assessment:\n\n${pending
-                .map((a) => `${a.name} (${a.id}) — ${a.employment}`)
-                .join("\n")}`;
-            }
-            return ranked.length
-              ? `Highest predicted default risk across the book:\n\n${ranked.slice(0, 5).map(pdLine).join("\n")}`
-              : "There are no assessments yet — run one from the Applicants page and I'll be able to compare them.";
-          }}
         />
       </div>
     </div>

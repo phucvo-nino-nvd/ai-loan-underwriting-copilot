@@ -1,0 +1,40 @@
+# Environment files
+.env
+.env.local
+
+# Python virtual environments
+.venv/
+venv/
+env/
+backend/swin_2026/
+
+# Python bytecode and caches
+__pycache__/
+*.py[cod]
+*.so
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# Build artifacts
+build/
+dist/
+*.egg-info/
+*.egg
+
+# Project generated artifacts
+output/
+backend/vector_db/
+backend/memory/
+
+# Frontend dependencies and build output
+node_modules/
+.next/
+out/
+dist/
+
+# OS/editor files
+.DS_Store
+.idea/
+.vscode/
+.omo/

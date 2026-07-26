@@ -1,36 +1,44 @@
-"""Prompt building + Claude call for the credit-risk LLM layer.
-
-Input comes from the ml layer: `EnsembleModels.predict` (probability) and
-`Explainer.top_features` (list of {feature, value, shap_value, importance}).
-"""
 from __future__ import annotations
 from pathlib import Path
-from openai import OpenAI
-from langchain_chroma import Chroma
-from langchain_nvidia_ai_endpoints import NVIDIAEmbeddings
-from dotenv import load_dotenv
 from functools import lru_cache
-
+from dotenv import load_dotenv
 import os
+import warnings
 
-load_dotenv(override=True)
-MODEL = "google/diffusiongemma-26b-a4b-it"
+warnings.filterwarnings("ignore", category=DeprecationWarning, module="langgraph")
 
-# Same store + embedding model as rag/ingest.py.
+from langchain_nvidia_ai_endpoints import ChatNVIDIA, NVIDIAEmbeddings
+from langchain_core.messages import SystemMessage, HumanMessage, AIMessage, BaseMessage
+from langgraph.checkpoint.memory import MemorySaver
+from langgraph.graph import StateGraph, END
+from langgraph.prebuilt import ToolNode
+from langchain_chroma import Chroma
+from typing import TypedDict, Annotated, Sequence
+import operator
+
+from . import mcp_server
+
+load_dotenv(".env.local", override=True)
+MODEL = "openai/gpt-oss-120b"
 DB_NAME = str(Path(__file__).parent / "vector_db")
 
-
+# ---------------------------------------------------------------------------
+# RAG retriever
+# ---------------------------------------------------------------------------
 @lru_cache(maxsize=1)
 def get_retriever():
-    """Built on first use so the API still boots without a vector store / API key."""
     return Chroma(
         persist_directory=DB_NAME,
         embedding_function=NVIDIAEmbeddings(
             model="nvidia/nv-embedqa-e5-v5",
-            api_key=os.getenv("NVDIA_API_KEY"),
+            api_key=os.getenv("NVIDIA_API_KEY"),
         ),
     ).as_retriever(search_kwargs={"k": 10})
 
+
+# ---------------------------------------------------------------------------
+# Prompts
+# ---------------------------------------------------------------------------
 BANDS = ((0.10, "LOW"), (0.30, "MEDIUM"), (0.60, "HIGH"), (1.01, "VERY HIGH"))
 
 SYSTEM = """You are a credit risk analyst. You receive a default probability predicted by
@@ -43,8 +51,12 @@ A=amount, P=days past due, L=count/flag, T=category, D=date; prefixes such as
 applprev_/person1_ identify the source table.
 
 Ground every conclusion in the data provided — never invent figures. Translate technical
-feature names into business language."""
+feature names into business language.
 
+You have access to a browser tool (playwright). If the user asks about current events,
+specific dates, or anything that might have changed since your training cutoff, navigate
+to a search engine (e.g. bing.com) to find up-to-date information. Otherwise answer from
+your training data."""
 
 
 def risk_band(probability: float) -> str:
@@ -54,21 +66,16 @@ def risk_band(probability: float) -> str:
     return "VERY HIGH"
 
 
-def format_features(top_features: list[dict]) -> str:
-    lines = []
-    for f in top_features:
-        direction = "raises risk" if f["shap_value"] > 0 else "lowers risk"
-        lines.append(
-            f"- {f['feature']} = {f['value']} | SHAP {f['shap_value']:+.4f} ({direction})"
-        )
-    return "\n".join(lines)
-
-
 def _context(case_id, probability: float, top_features: list[dict]) -> str:
+    features = "\n".join(
+        f"- {f['feature']} = {f['value']} | SHAP {f['shap_value']:+.4f} "
+        f"({'raises risk' if f['shap_value'] > 0 else 'lowers risk'})"
+        for f in top_features
+    )
     return (
         f"Application: {case_id}\n"
         f"Default probability: {probability:.2%} (risk band: {risk_band(probability)})\n\n"
-        f"Strongest contributing factors:\n{format_features(top_features)}"
+        f"Strongest contributing factors:\n{features}"
     )
 
 
@@ -92,76 +99,97 @@ def build_recommend_prompt(case_id, probability: float, top_features: list[dict]
         Keep it tight: at most 3 bullets per section."""
 
 
-def stream(prompt: str, history: list[dict] | None = None, ai_config: dict | None = None, max_tokens: int = 4000):
-    import concurrent.futures
+# ---------------------------------------------------------------------------
+# LangGraph agent
+# ---------------------------------------------------------------------------
+class AgentState(TypedDict):
+    messages: Annotated[Sequence[BaseMessage], operator.add]
 
+
+def stream(
+    prompt: str,
+    history: list[dict] | None = None,
+    ai_config: dict | None = None,
+    max_tokens: int = 4000,
+):
+    """Stream tokens from a LangGraph agent with optional MCP tools."""
     ai_config = ai_config or {}
     temperature = ai_config.get("temperature", 1.0)
     max_tokens = ai_config.get("maxTokens", max_tokens)
-    preferred_model = ai_config.get("preferredModel")
+    preferred_model = ai_config.get("preferredModel") or MODEL
+    api_key = ai_config.get("nvidiaKey") or os.getenv("NVIDIA_API_KEY")
 
+    if not api_key:
+        yield "NVIDIA API key is not configured."
+        return
+
+    # RAG context (best-effort)
     try:
         context = "\n\n".join(d.page_content for d in get_retriever().invoke(prompt))
     except Exception:
         context = "(none)"
 
+    def to_lc(msg: dict):
+        role = msg.get("role", "")
+        content = msg.get("content", "")
+        if role == "assistant":
+            return AIMessage(content=content)
+        if role == "system":
+            return SystemMessage(content=content)
+        return HumanMessage(content=content)
+
     messages = [
-        {"role": "system", "content": f"{SYSTEM}\n\nInternal policy context:\n{context}"},
-        *(history or []),
-        {"role": "user", "content": prompt},
+        SystemMessage(content=f"{SYSTEM}\n\nInternal policy context:\n{context}"),
+        *(to_lc(m) for m in (history or [])),
+        HumanMessage(content=prompt),
     ]
 
-    def _stream(base_url, api_key, model, extra=None):
-        client = OpenAI(base_url=base_url, api_key=api_key)
-        kwargs = dict(model=model, messages=messages, temperature=temperature, top_p=0.95, max_tokens=max_tokens, stream=True)
-        if extra:
-            kwargs["extra_body"] = extra
-        return client.chat.completions.create(**kwargs)
+    model = ChatNVIDIA(
+        model=preferred_model,
+        api_key=api_key,
+        temperature=temperature,
+        top_p=1,
+        max_tokens=max_tokens,
+    )
 
-    def _yield(completion):
-        for chunk in completion:
-            if chunk.choices and chunk.choices[0].delta.content:
-                yield chunk.choices[0].delta.content
+    tools = mcp_server.mcp_tools or []
+    agent = model.bind_tools(tools) if tools else model
 
-    gemini_key = ai_config.get("geminiKey") or os.getenv("GEMINI_API_KEY")
-    nvidia_key = ai_config.get("nvidiaKey") or os.getenv("NVDIA_API_KEY")
-    
-    models_to_try = []
-    
-    if preferred_model == "google/diffusiongemma-26b-a4b-it":
-        models_to_try.append(("nvidia", "google/diffusiongemma-26b-a4b-it"))
-        models_to_try.append(("gemini", "gemini-2.5-flash-lite"))
-        models_to_try.append(("gemini", "gemini-2.5-flash"))
-    elif preferred_model == "gemini-2.5-flash":
-        models_to_try.append(("gemini", "gemini-2.5-flash"))
-        models_to_try.append(("gemini", "gemini-2.5-flash-lite"))
-        models_to_try.append(("nvidia", "google/diffusiongemma-26b-a4b-it"))
+    def call_agent(state: AgentState) -> dict:
+        response = agent.invoke(state["messages"])
+        return {"messages": [response]}
+
+    def route(state: AgentState) -> str:
+        last = state["messages"][-1]
+        if getattr(last, "tool_calls", None):
+            return "tools"
+        return END
+
+    graph = StateGraph(AgentState)
+    graph.add_node("agent", call_agent)
+    if tools:
+        graph.add_node("tools", ToolNode(tools))
+        graph.add_edge("tools", "agent")
+        graph.add_conditional_edges("agent", route, {"tools": "tools", END: END})
     else:
-        models_to_try.append(("gemini", "gemini-2.5-flash-lite"))
-        models_to_try.append(("gemini", "gemini-2.5-flash"))
-        models_to_try.append(("nvidia", "google/diffusiongemma-26b-a4b-it"))
+        graph.add_edge("agent", END)
+    graph.set_entry_point("agent")
+    compiled = graph.compile(checkpointer=MemorySaver())
 
-    for provider, model in models_to_try:
-        try:
-            if provider == "gemini" and gemini_key:
-                gemini_base = "https://generativelanguage.googleapis.com/v1beta/openai/"
-                pool = concurrent.futures.ThreadPoolExecutor(max_workers=1)
-                future = pool.submit(_stream, gemini_base, gemini_key, model)
-                yield from _yield(future.result(timeout=4))
-                pool.shutdown(wait=False)
-                return
-            elif provider == "nvidia" and nvidia_key:
-                pool = concurrent.futures.ThreadPoolExecutor(max_workers=1)
-                future = pool.submit(_stream, "https://integrate.api.nvidia.com/v1", nvidia_key, model, {"chat_template_kwargs":{"enable_thinking":True},"reasoning_budget":max_tokens})
-                yield from _yield(future.result(timeout=4))
-                pool.shutdown(wait=False)
-                return
-        except (concurrent.futures.TimeoutError, Exception) as e:
-            pass
+    config = {"configurable": {"thread_id": "stream"}, "recursion_limit": 20}
 
-    yield "All configured AI models timed out or failed. Please check your API keys."
+    try:
+        for event in compiled.stream(
+            {"messages": messages}, config, stream_mode="messages"
+        ):
+            if not isinstance(event, tuple):
+                continue
+            chunk, metadata = event
+            if metadata.get("langgraph_node", "") == "agent" and getattr(chunk, "content", None):
+                yield chunk.content
+    except Exception as e:
+        yield f"⚠️ API error ({type(e).__name__}): {e}"
 
 
 def ask(prompt: str, history: list[dict] | None = None, max_tokens: int = 4000) -> str:
-    return "".join(stream(prompt, history, max_tokens))
-
+    return "".join(stream(prompt, history, max_tokens=max_tokens))

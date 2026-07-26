@@ -16,6 +16,8 @@ pyarrow>=15.0.0
 # --- LLM layer (app/llm) ---
 openai>=1.40.0
 python-dotenv>=1.0.0
+langgraph>=1.2.0
+langchain-mcp-adapters>=0.3.0
 
 # --- API layer (used by app/main.py + routes, added in the next step) ---
 fastapi>=0.110.0

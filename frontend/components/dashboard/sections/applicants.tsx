@@ -496,33 +496,6 @@ function ReviewCard({
           "Which need manual referral?",
           "Draft a summary for the credit committee",
         ]}
-        mockReply={(q) => {
-          if (/refer|polic/i.test(q)) {
-            const refer = scored.filter((r) => r.latest!.risk_band === "HIGH" || r.latest!.risk_band === "VERY HIGH");
-            return refer.length
-              ? `CRD-019 requires manual referral for:\n\n${refer.map(line).join("\n")}`
-              : "None of the scored applicants in this set breach the CRD-019 referral trigger.";
-          }
-          if (/afford|income|dti|compare/i.test(q))
-            return `By exposure to income:\n\n${[...rows]
-              .sort(
-                (a, b) =>
-                  b.applicant.loan_amount / b.applicant.income - a.applicant.loan_amount / a.applicant.income
-              )
-              .map(line)
-              .join("\n")}`;
-          if (/summar|committee|draft/i.test(q))
-            return (
-              `Committee summary — ${rows.length} applications, total requested ${formatMoney(
-                rows.reduce((acc, r) => acc + r.applicant.loan_amount, 0)
-              )}.\n\n${scored.map(line).join("\n")}` +
-              (unscored.length ? `\n\nStill awaiting assessment:\n${unscored.map(line).join("\n")}` : "")
-            );
-          return scored.length
-            ? `Ranked by predicted default risk:\n\n${scored.map(line).join("\n")}` +
-                (unscored.length ? `\n\nNot yet scored: ${unscored.map((r) => r.applicant.name).join(", ")}` : "")
-            : "None of the selected applicants have been assessed yet — run an assessment and I can rank them.";
-        }}
       />
     </div>
   );
