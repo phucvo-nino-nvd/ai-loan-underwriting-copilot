@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import asyncio
 from contextlib import AsyncExitStack
+from pathlib import Path
 
 from langchain_mcp_adapters.client import MultiServerMCPClient
 from langchain_mcp_adapters.tools import load_mcp_tools
@@ -32,11 +33,18 @@ def set_mcp_tools(tools: list) -> None:
 
 def mcp_connections() -> dict:
     """MCP servers the agent can use."""
+    args = ["-y", "@playwright/mcp@latest", "--isolated", "--headless"]
+    cache = Path.home() / ".cache" / "ms-playwright"
+    for path in sorted(cache.glob("chromium-*/chrome-linux64/chrome"), reverse=True):
+        if path.is_file():
+            args.extend(["--executable-path", str(path)])
+            break
+
     return {
         "playwright": {
             "transport": "stdio",
             "command": "npx",
-            "args": ["-y", "@playwright/mcp@latest", "--isolated", "--headless"],
+            "args": args,
         },
     }
 

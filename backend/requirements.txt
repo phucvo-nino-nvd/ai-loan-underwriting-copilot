@@ -16,6 +16,10 @@ pyarrow>=15.0.0
 # --- LLM layer (app/llm) ---
 openai>=1.40.0
 python-dotenv>=1.0.0
+langchain-nvidia-ai-endpoints>=0.3.0
+langchain-chroma>=0.2.0
+langchain-community>=0.3.0
+langchain-text-splitters>=0.3.0
 langgraph>=1.2.0
 langchain-mcp-adapters>=0.3.0
 
