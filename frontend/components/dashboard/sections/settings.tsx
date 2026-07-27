@@ -860,9 +860,11 @@ export function SettingsSection({
                   <SelectTrigger className="bg-secondary border-border max-w-sm">
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="openai/gpt-oss-120b">NVIDIA openai-oss-120b</SelectItem>
-                  </SelectContent>
+                   <SelectContent>
+                     <SelectItem value="openai/gpt-oss-120b">NVIDIA openai-oss-120b</SelectItem>
+                     <SelectItem value="openai/chatgpt-oss-20b">GPT OSS 20B</SelectItem>
+                     <SelectItem value="deepseek/deepseek-v4-flash">DeepSeek V4 Flash</SelectItem>
+                   </SelectContent>
                 </Select>
                 <p className="text-xs text-muted-foreground mt-1">
                   First-choice model for policy queries and report generation.

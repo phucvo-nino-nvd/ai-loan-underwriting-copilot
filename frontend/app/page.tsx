@@ -52,6 +52,7 @@ export default function LandingPage() {
 
   const handleGoogleSignIn = async () => {
     if (!clerk.loaded) return;
+    if (isSignedIn) { router.push("/dashboard"); return; }
     try {
       await clerk.client.signIn.authenticateWithRedirect({
         strategy: "oauth_google",
@@ -65,6 +66,7 @@ export default function LandingPage() {
 
   const handleGithubSignIn = async () => {
     if (!clerk.loaded) return;
+    if (isSignedIn) { router.push("/dashboard"); return; }
     try {
       await clerk.client.signIn.authenticateWithRedirect({
         strategy: "oauth_github",

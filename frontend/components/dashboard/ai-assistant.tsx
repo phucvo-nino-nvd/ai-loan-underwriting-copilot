@@ -34,6 +34,7 @@ export function AiAssistant({
   const idCounter = useRef(1);
 
   const [hasKey, setHasKey] = useState(true);
+  const [model, setModel] = useState("openai/gpt-oss-120b");
 
   useEffect(() => {
     try {
@@ -43,6 +44,9 @@ export function AiAssistant({
         if (!data?.aiConfig?.nvidiaKey) {
           setHasKey(false);
         }
+        if (data?.aiConfig?.preferredModel) {
+          setModel(data.aiConfig.preferredModel);
+        }
       } else {
         setHasKey(false);
       }
@@ -50,6 +54,19 @@ export function AiAssistant({
       setHasKey(false);
     }
   }, []);
+
+  function updateModel(value: string) {
+    setModel(value);
+    try {
+      const raw = localStorage.getItem("swin_settings");
+      if (raw) {
+        const data = JSON.parse(raw);
+        data.aiConfig = data.aiConfig ?? {};
+        data.aiConfig.preferredModel = value;
+        localStorage.setItem("swin_settings", JSON.stringify(data));
+      }
+    } catch {}
+  }
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
@@ -193,6 +210,28 @@ export function AiAssistant({
             aria-label="Ask a follow-up question"
             className="flex-1 h-9 px-4 bg-secondary border border-border text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring/20 focus:border-accent transition-all duration-200"
           />
+          <div className="relative">
+            <select
+              value={model}
+              onChange={(e) => updateModel(e.target.value)}
+              className="h-9 appearance-none bg-secondary border border-border text-muted-foreground text-xs pl-2 pr-6 focus:outline-none focus:ring-2 focus:ring-ring/20 focus:border-accent transition-all duration-200 cursor-pointer"
+            >
+              <option value="openai/gpt-oss-120b">GPT OSS 120B</option>
+              <option value="openai/chatgpt-oss-20b">GPT OSS 20B</option>
+              <option value="deepseek/deepseek-v4-flash">DeepSeek V4</option>
+            </select>
+            <svg
+              className="pointer-events-none absolute right-1.5 top-1/2 -translate-y-1/2 w-3 h-3 text-muted-foreground"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <polyline points="6 9 12 15 18 9" />
+            </svg>
+          </div>
           <button
             type="submit"
             disabled={!input.trim() || isTyping}

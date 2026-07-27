@@ -1,6 +1,6 @@
 "use client";
 
-import { useClerk, useSignIn } from "@clerk/nextjs";
+import { useClerk, useSignIn, useAuth } from "@clerk/nextjs";
 import { Bebas_Neue, IBM_Plex_Mono } from "next/font/google";
 import Link from "next/link";
 import { ArrowLeft, Loader2, Eye, EyeOff } from "lucide-react";
@@ -22,6 +22,7 @@ const GoogleIcon = ({ className }: { className?: string }) => (
 export default function LoginPage() {
   const clerk = useClerk();
   const { signIn } = useSignIn();
+  const { isSignedIn } = useAuth();
   const router = useRouter();
   
   const [email, setEmail] = useState("");
@@ -32,6 +33,7 @@ export default function LoginPage() {
 
   const handleGoogleSignIn = async () => {
     if (!clerk.loaded) return;
+    if (isSignedIn) { router.push("/dashboard"); return; }
     try {
       await clerk.client.signIn.authenticateWithRedirect({
         strategy: "oauth_google",

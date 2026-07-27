@@ -154,8 +154,10 @@ export default function OnboardingPage() {
                     onChange={(e) => setProvider(e.target.value)}
                     className="w-full h-9 px-3 rounded-lg bg-secondary border border-border text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring/20 focus:border-accent transition-all duration-200"
                   >
-                    <option value="openai/gpt-oss-120b">NVIDIA openai-oss-120b</option>
-                  </select>
+                     <option value="openai/gpt-oss-120b">NVIDIA openai-oss-120b</option>
+                     <option value="openai/chatgpt-oss-20b">GPT OSS 20B</option>
+                     <option value="deepseek/deepseek-v4-flash">DeepSeek V4 Flash</option>
+                   </select>
               </div>
 
               <div className="space-y-2">
