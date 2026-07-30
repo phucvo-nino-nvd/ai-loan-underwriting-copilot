@@ -3,7 +3,7 @@
 import { useUser } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { Loader2, Eye, EyeOff } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { BitmapChevron } from "@/components/landing/bitmap-chevron";
 
 export default function OnboardingPage() {
@@ -14,8 +14,6 @@ export default function OnboardingPage() {
   const [role, setRole] = useState("analyst");
   const [timezone, setTimezone] = useState("utc");
   const [provider, setProvider] = useState("openai/gpt-oss-120b");
-  const [nvidiaKey, setNvidiaKey] = useState("");
-  const [showNvidiaKey, setShowNvidiaKey] = useState(false);
   const [saving, setSaving] = useState(false);
   const [submitError, setSubmitError] = useState("");
 
@@ -48,7 +46,6 @@ export default function OnboardingPage() {
       }
       if (!settings.aiConfig) settings.aiConfig = {};
       settings.aiConfig.preferredModel = provider;
-      if (nvidiaKey) settings.aiConfig.nvidiaKey = nvidiaKey;
       localStorage.setItem("swin_settings", JSON.stringify(settings));
 
       router.replace("/dashboard");
@@ -95,7 +92,7 @@ export default function OnboardingPage() {
                 value={firstName}
                 onChange={(e) => setFirstName(e.target.value)}
                 required
-                className="w-full h-9 px-3 rounded-lg bg-secondary border border-border text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring/20 focus:border-accent transition-all duration-200"
+                className="w-full h-9 px-3 bg-secondary border border-border text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring/20 focus:border-accent transition-all duration-200"
               />
             </div>
             <div className="space-y-2">
@@ -105,7 +102,7 @@ export default function OnboardingPage() {
                 value={lastName}
                 onChange={(e) => setLastName(e.target.value)}
                 required
-                className="w-full h-9 px-3 rounded-lg bg-secondary border border-border text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring/20 focus:border-accent transition-all duration-200"
+                className="w-full h-9 px-3 bg-secondary border border-border text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring/20 focus:border-accent transition-all duration-200"
               />
             </div>
           </div>
@@ -117,7 +114,7 @@ export default function OnboardingPage() {
                 id="role"
                 value={role}
                 onChange={(e) => setRole(e.target.value)}
-                className="w-full h-9 px-3 rounded-lg bg-secondary border border-border text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring/20 focus:border-accent transition-all duration-200"
+                className="w-full h-9 px-3 bg-secondary border border-border text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring/20 focus:border-accent transition-all duration-200"
               >
                 <option value="admin">Administrator</option>
                 <option value="manager">Underwriting Manager</option>
@@ -132,7 +129,7 @@ export default function OnboardingPage() {
                 id="timezone"
                 value={timezone}
                 onChange={(e) => setTimezone(e.target.value)}
-                className="w-full h-9 px-3 rounded-lg bg-secondary border border-border text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring/20 focus:border-accent transition-all duration-200"
+                className="w-full h-9 px-3 bg-secondary border border-border text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring/20 focus:border-accent transition-all duration-200"
               >
                 <option value="pst">Pacific Time (PT)</option>
                 <option value="mst">Mountain Time (MT)</option>
@@ -152,35 +149,15 @@ export default function OnboardingPage() {
                     id="provider"
                     value={provider}
                     onChange={(e) => setProvider(e.target.value)}
-                    className="w-full h-9 px-3 rounded-lg bg-secondary border border-border text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring/20 focus:border-accent transition-all duration-200"
+                    className="w-full h-9 px-3 bg-secondary border border-border text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring/20 focus:border-accent transition-all duration-200"
                   >
-                     <option value="openai/gpt-oss-120b">NVIDIA openai-oss-120b</option>
-                     <option value="openai/chatgpt-oss-20b">GPT OSS 20B</option>
+                     <option value="openai/gpt-oss-120b">GPT-OSS 120B</option>
+                     <option value="openai/gpt-oss-20b">GPT-OSS 20B</option>
                      <option value="deepseek/deepseek-v4-flash">DeepSeek V4 Flash</option>
                    </select>
               </div>
 
-              <div className="space-y-2">
-                <label htmlFor="nvidiaKey" className="text-sm font-medium text-foreground">NVIDIA API Key</label>
-                <div className="relative">
-                  <input
-                    id="nvidiaKey"
-                    type={showNvidiaKey ? "text" : "password"}
-                    value={nvidiaKey}
-                    onChange={(e) => setNvidiaKey(e.target.value)}
-                    placeholder="nvapi-… (optional)"
-                    className="w-full h-9 px-3 pr-10 rounded-lg bg-secondary border border-border text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring/20 focus:border-accent transition-all duration-200"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowNvidiaKey(!showNvidiaKey)}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
-                    tabIndex={-1}
-                  >
-                    {showNvidiaKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                  </button>
-                </div>
-              </div>
+
             </div>
           </div>
 

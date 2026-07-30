@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 import { useApi } from "@/lib/api";
-import { Send, Sparkles, Key } from "lucide-react";
+import { Send, Sparkles } from "lucide-react";
 import { MarkdownText } from "@/components/ui/markdown-text";
 
 interface Message {
@@ -33,7 +33,6 @@ export function AiAssistant({
   const sessionRef = useRef<string | null>(null);
   const idCounter = useRef(1);
 
-  const [hasKey, setHasKey] = useState(true);
   const [model, setModel] = useState("openai/gpt-oss-120b");
 
   useEffect(() => {
@@ -41,18 +40,11 @@ export function AiAssistant({
       const raw = localStorage.getItem("swin_settings");
       if (raw) {
         const data = JSON.parse(raw);
-        if (!data?.aiConfig?.nvidiaKey) {
-          setHasKey(false);
-        }
         if (data?.aiConfig?.preferredModel) {
           setModel(data.aiConfig.preferredModel);
         }
-      } else {
-        setHasKey(false);
       }
-    } catch {
-      setHasKey(false);
-    }
+    } catch {}
   }, []);
 
   function updateModel(value: string) {
@@ -71,22 +63,6 @@ export function AiAssistant({
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
   }, [messages, isTyping]);
-
-  if (!hasKey) {
-    return (
-      <div className="flex flex-col items-center justify-center h-72 sm:h-80 text-center bg-secondary/20 border border-border/50 p-6 animate-in fade-in">
-        <Key className="w-10 h-10 mb-4 text-muted-foreground" />
-        <h3 className="text-base font-semibold text-foreground tracking-tight">API Key Required</h3>
-        <p className="text-sm text-muted-foreground mt-2 max-w-sm leading-relaxed">
-           Please configure an NVIDIA API Key to use the Assistant. 
-          Your keys are stored securely in your browser.
-        </p>
-        <p className="text-xs font-bold font-mono uppercase tracking-widest text-accent mt-6">
-          Go to Settings &rarr; AI Config
-        </p>
-      </div>
-    );
-  }
 
   async function send(text: string) {
     const question = text.trim();
@@ -214,11 +190,11 @@ export function AiAssistant({
             <select
               value={model}
               onChange={(e) => updateModel(e.target.value)}
-              className="h-9 appearance-none bg-secondary border border-border text-muted-foreground text-xs pl-2 pr-6 focus:outline-none focus:ring-2 focus:ring-ring/20 focus:border-accent transition-all duration-200 cursor-pointer"
+              className="h-9 appearance-none bg-secondary border border-border text-foreground text-xs font-medium pl-3 pr-7 focus:outline-none focus:ring-2 focus:ring-ring/20 focus:border-accent transition-all duration-200 cursor-pointer hover:border-accent/50"
             >
-              <option value="openai/gpt-oss-120b">GPT OSS 120B</option>
-              <option value="openai/chatgpt-oss-20b">GPT OSS 20B</option>
-              <option value="deepseek/deepseek-v4-flash">DeepSeek V4</option>
+              <option value="openai/gpt-oss-120b">GPT-OSS 120B</option>
+              <option value="openai/gpt-oss-20b">GPT-OSS 20B</option>
+              <option value="deepseek/deepseek-v4-flash">DeepSeek V4 Flash</option>
             </select>
             <svg
               className="pointer-events-none absolute right-1.5 top-1/2 -translate-y-1/2 w-3 h-3 text-muted-foreground"

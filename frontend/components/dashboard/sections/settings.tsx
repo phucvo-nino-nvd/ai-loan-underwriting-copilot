@@ -39,10 +39,7 @@ import {
   Key,
   Download,
   Trash2,
-  Eye,
-  EyeOff,
   Cpu,
-  Copy,
   AlertTriangle,
   Camera,
   Loader2,
@@ -69,7 +66,6 @@ interface AppSettings {
   profile: ProfileSettings;
   aiConfig: {
     preferredModel: string;
-    nvidiaKey: string;
     temperature: number;
     maxTokens: number;
   };
@@ -100,7 +96,6 @@ function defaultSettings(userName?: string, userEmail?: string): AppSettings {
     },
     aiConfig: {
       preferredModel: "openai/gpt-oss-120b",
-      nvidiaKey: "",
       temperature: 0.7,
       maxTokens: 2048,
     },
@@ -309,7 +304,6 @@ export function SettingsSection({
     loadSettings(userName, userEmail)
   );
   const [activeTab, setActiveTab] = useState("profile");
-  const [showNvidiaKey, setShowNvidiaKey] = useState(false);
 
   // Persist on every change & notify sidebar
   useEffect(() => {
@@ -405,13 +399,6 @@ export function SettingsSection({
         success: `${format.toUpperCase()} export ready for download`,
         error: "Export failed",
       }
-    );
-  };
-
-  const handleCopyApiKey = (key: string, label: string) => {
-    navigator.clipboard.writeText(key).then(
-      () => toast.success(`${label} copied to clipboard`),
-      () => toast.error("Failed to copy")
     );
   };
 
@@ -861,61 +848,14 @@ export function SettingsSection({
                     <SelectValue />
                   </SelectTrigger>
                    <SelectContent>
-                     <SelectItem value="openai/gpt-oss-120b">NVIDIA openai-oss-120b</SelectItem>
-                     <SelectItem value="openai/chatgpt-oss-20b">GPT OSS 20B</SelectItem>
+                     <SelectItem value="openai/gpt-oss-120b">GPT-OSS 120B</SelectItem>
+                     <SelectItem value="openai/gpt-oss-20b">GPT-OSS 20B</SelectItem>
                      <SelectItem value="deepseek/deepseek-v4-flash">DeepSeek V4 Flash</SelectItem>
                    </SelectContent>
                 </Select>
                 <p className="text-xs text-muted-foreground mt-1">
                   First-choice model for policy queries and report generation.
                 </p>
-              </div>
-
-              <Separator className="bg-border" />
-
-              <div className="space-y-4">
-                <div>
-                  <h4 className="text-sm font-medium text-foreground mb-1">API Keys</h4>
-                  <p className="text-xs text-muted-foreground mb-4">
-                    API keys are stored locally and never sent to our servers.
-                  </p>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="nvidiaKey">NVIDIA API Key</Label>
-                  <div className="flex gap-2 max-w-md">
-                    <div className="relative flex-1">
-                      <Input
-                        id="nvidiaKey"
-                        type={showNvidiaKey ? "text" : "password"}
-                        value={settings.aiConfig.nvidiaKey}
-                        onChange={(e) => updateAiConfig({ nvidiaKey: e.target.value })}
-                        placeholder="nvapi-…"
-                        className="bg-secondary border-border focus:border-accent pr-10"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setShowNvidiaKey(!showNvidiaKey)}
-                        className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
-                      >
-                        {showNvidiaKey ? (
-                          <EyeOff className="w-4 h-4" />
-                        ) : (
-                          <Eye className="w-4 h-4" />
-                        )}
-                      </button>
-                    </div>
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      className="shrink-0"
-                      onClick={() => handleCopyApiKey(settings.aiConfig.nvidiaKey, "NVIDIA API key")}
-                      disabled={!settings.aiConfig.nvidiaKey}
-                    >
-                      <Copy className="w-4 h-4" />
-                    </Button>
-                  </div>
-                </div>
               </div>
 
               <Separator className="bg-border" />

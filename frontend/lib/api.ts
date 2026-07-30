@@ -51,14 +51,7 @@ export function useApi() {
 
       /** SSE over POST — EventSource can't send an Authorization header, so read the stream by hand. */
       async *stream(path: "/report" | "/policy", body: any): AsyncGenerator<StreamEvent> {
-        let aiConfig = undefined;
-        try {
-          const raw = localStorage.getItem("swin_settings");
-          if (raw) aiConfig = JSON.parse(raw).aiConfig;
-        } catch {}
-
-        const payload = typeof body === "object" && body !== null ? { ...body, ai_config: aiConfig } : body;
-        const res = await request(path, payload);
+        const res = await request(path, body);
         const sessionId = res.headers.get("X-Session-Id");
         if (sessionId) yield { type: "session", sessionId };
 
