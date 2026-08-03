@@ -232,11 +232,10 @@ export function ApplicantsSection({
                   </AvatarFallback>
                 </Avatar>
 
-                <div className="min-w-0 flex-1 md:flex-initial">
+                <div className="min-w-0 flex-1 md:flex-initial flex items-center h-full">
                   <p className="text-sm font-medium text-foreground truncate group-hover:text-accent transition-colors">
                     {applicant.name}
                   </p>
-                  <p className="font-mono text-xs text-muted-foreground">{applicant.id}</p>
                 </div>
 
                 {[
@@ -409,9 +408,10 @@ function ReviewCard({
   onOpenAssessment: (assessmentId: string) => void;
   onClose: () => void;
 }) {
-  const rows = ids
-    .map((id) => ({ applicant: applicants.find((a) => a.id === id)!, latest: latestFor(id) }))
-    .filter((r) => r.applicant);
+  const rows = ids.flatMap((id) => {
+    const applicant = applicants.find((a) => a.id === id);
+    return applicant ? [{ applicant, latest: latestFor(id) }] : [];
+  });
 
   const scored = rows.filter((r) => r.latest).sort((a, b) => b.latest!.probability - a.latest!.probability);
   const unscored = rows.filter((r) => !r.latest);
@@ -451,9 +451,8 @@ function ReviewCard({
             key={applicant.id}
             className="flex items-center justify-between gap-3 p-3 bg-secondary/40 border border-border"
           >
-            <div className="min-w-0">
+            <div className="min-w-0 flex items-center h-full">
               <p className="text-sm font-medium text-foreground truncate">{applicant.name}</p>
-              <p className="font-mono text-xs text-muted-foreground">{applicant.id}</p>
             </div>
             <div className="flex items-center gap-3 shrink-0">
               <span className="text-sm text-muted-foreground tabular-nums">{formatMoney(applicant.loan_amount)}</span>

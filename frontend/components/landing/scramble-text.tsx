@@ -1,7 +1,6 @@
 "use client"
 
 import { useEffect, useState, useRef, useCallback } from "react"
-import gsap from "gsap"
 
 interface ScrambleTextProps {
   text: string
@@ -25,36 +24,42 @@ function runScrambleAnimation(
   duration: number,
   setDisplayText: (text: string) => void,
   onComplete?: () => void,
-): gsap.core.Tween {
-  const lockedIndices = new Set<number>()
+): { kill: () => void } {
   const finalChars = text.split("")
   const totalChars = finalChars.length
-  const scrambleObj = { progress: 0 }
+  let start: number | null = null
+  let rafId: number
 
-  return gsap.to(scrambleObj, {
-    progress: 1,
-    duration,
-    ease: "power2.out",
-    onUpdate: () => {
-      const numLocked = Math.floor(scrambleObj.progress * totalChars)
-      for (let i = 0; i < numLocked; i++) lockedIndices.add(i)
-      const newDisplay = finalChars
-        .map((char, i) => (lockedIndices.has(i) ? char : GLYPHS[Math.floor(Math.random() * GLYPHS.length)]))
-        .join("")
-      setDisplayText(newDisplay)
-    },
-    onComplete: () => {
+  function step(timestamp: number) {
+    if (!start) start = timestamp
+    const elapsed = (timestamp - start) / 1000
+    const progress = Math.min(elapsed / duration, 1)
+    const easeProgress = progress * (2 - progress)
+
+    const numLocked = Math.floor(easeProgress * totalChars)
+    const newDisplay = finalChars
+      .map((char, i) => (i < numLocked ? char : GLYPHS[Math.floor(Math.random() * GLYPHS.length)]))
+      .join("")
+
+    setDisplayText(newDisplay)
+
+    if (progress < 1) {
+      rafId = requestAnimationFrame(step)
+    } else {
       setDisplayText(text)
       onComplete?.()
-    },
-  })
+    }
+  }
+
+  rafId = requestAnimationFrame(step)
+  return { kill: () => cancelAnimationFrame(rafId) }
 }
 
 export function ScrambleText({ text, className, delayMs = 0, duration = 0.9 }: ScrambleTextProps) {
   const [displayText, setDisplayText] = useState(text)
   const [hasAnimated, setHasAnimated] = useState(false)
   const containerRef = useRef<HTMLSpanElement>(null)
-  const animationRef = useRef<gsap.core.Tween | null>(null)
+  const animationRef = useRef<{ kill: () => void } | null>(null)
   const timeoutRef = useRef<NodeJS.Timeout | null>(null)
 
   useEffect(() => {
@@ -97,7 +102,7 @@ export function ScrambleTextOnHover({
 }: ScrambleTextOnHoverProps) {
   const [displayText, setDisplayText] = useState(text)
   const isAnimating = useRef(false)
-  const tweenRef = useRef<gsap.core.Tween | null>(null)
+  const tweenRef = useRef<{ kill: () => void } | null>(null)
 
   const handleMouseEnter = useCallback(() => {
     if (isAnimating.current) return
@@ -125,3 +130,4 @@ export function ScrambleTextOnHover({
     </Component>
   )
 }
+

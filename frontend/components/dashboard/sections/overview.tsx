@@ -1,7 +1,7 @@
 "use client";
 
 import { MetricCard } from "@/components/dashboard/metric-card";
-import { RevenueChart } from "@/components/dashboard/charts/revenue-chart";
+import { PdTrendChart } from "@/components/dashboard/charts/pd-trend-chart";
 import { RiskDistribution } from "@/components/dashboard/charts/pipeline-overview";
 import { RecentDeals } from "@/components/dashboard/recent-deals";
 import { TopPerformers } from "@/components/dashboard/top-performers";
@@ -70,7 +70,7 @@ export function OverviewSection({
       {/* Charts row */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2">
-          <RevenueChart assessments={assessments} />
+          <PdTrendChart assessments={assessments} />
         </div>
         <RiskDistribution assessments={assessments} applicants={applicants} />
       </div>

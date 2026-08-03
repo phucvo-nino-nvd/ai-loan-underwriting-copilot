@@ -1,0 +1,14 @@
+# Part 2: Ingestion Pipeline Configuration
+# Copy this file to terraform.tfvars and update with your values
+
+# Your AWS region for the ingestion infrastructure
+# Should match your DEFAULT_AWS_REGION from .env
+aws_region = "ap-southeast-1"
+
+# Ingest container image URI after building and pushing Docker image
+ingest_image_uri = ""
+
+# API Key for OpenRouter embeddings
+openrouter_api_key = "sk-or ... "
+
+index_name = "policy-docs"

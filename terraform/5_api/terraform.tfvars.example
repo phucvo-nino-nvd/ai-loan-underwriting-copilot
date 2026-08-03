@@ -1,0 +1,32 @@
+# Part 5: API Configuration
+# Copy this file to terraform.tfvars and update with your values
+
+# Your AWS region for the API infrastructure
+# Should match your DEFAULT_AWS_REGION from .env
+aws_region = "ap-southeast-1"
+
+# API container image URI from ECR after building and pushing Docker image
+api_image_uri = ""
+
+# SageMaker classifier endpoint name (Part 1 output)
+classifier_endpoint_name = "aluci-classifier-endpoint"
+
+# Copilot Lambda public URL (Part 3 output)
+copilot_url = "https://...lambda-url.ap-southeast-1.on.aws"
+
+# Aurora cluster and secret ARNs (Part 4 outputs)
+aurora_cluster_arn = "arn:aws:rds:ap-southeast-1:<account-id>:cluster:aluci-aurora-cluster"
+aurora_secret_arn  = "arn:aws:secretsmanager:ap-southeast-1:<account-id>:secret:aluci-aurora-credentials-..."
+aurora_database    = "aluci"
+
+# Clerk JWKS URL for JWT validation (Clerk dashboard > API Keys > Show JWT public key)
+clerk_jwks_url = "https://<your-instance>.clerk.accounts.dev/.well-known/jwks.json"
+
+# Ingest Lambda name (Part 2 output)
+ingest_function_name = "aluci-ingest"
+
+# Allowed CORS origins (comma-separated)
+cors_origins = "http://localhost:3000"
+
+# Function URL access: keep NONE until phase 6 creates CloudFront, then switch to AWS_IAM
+function_url_auth_type = "NONE"

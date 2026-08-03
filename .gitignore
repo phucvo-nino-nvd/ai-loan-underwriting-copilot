@@ -1,12 +1,13 @@
-# Environment files
+# Environment files — every variant holds real credentials, only the templates are committed
 .env
-.env.local
+.env.*
+!.env.example
+!.env.local.example
 
 # Python virtual environments
 .venv/
 venv/
 env/
-backend/swin_2026/
 
 # Python bytecode and caches
 __pycache__/
@@ -39,3 +40,14 @@ dist/
 .vscode/
 .omo/
 .codegraph/
+.claude/settings.local.json
+
+# Terraform files — .terraform.lock.hcl is deliberately not ignored, it pins the provider versions
+*.tfstate
+*.tfstate.*
+*.tfvars
+*.tfvars.json
+*.backup
+crash*.log
+.terraform/
+.terraform.tfstate.lock.info

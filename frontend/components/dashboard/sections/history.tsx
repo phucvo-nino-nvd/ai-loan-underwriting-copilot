@@ -60,7 +60,7 @@ export function HistorySection({
     const [latest] = runs;
     const matchesSearch =
       !query.trim() ||
-      matchPrefix(query.trim(), latest.applicantName, latest.applicantId) ||
+      matchPrefix(query.trim(), latest.applicantName, latest.applicantId, String(latest.caseId)) ||
       runs.some((r) => matchPrefix(query.trim(), r.id));
     return matchesSearch && (selectedFilter === "all" || latest.risk_band === selectedFilter);
   });
@@ -113,7 +113,7 @@ export function HistorySection({
           <table className="w-full">
             <thead>
               <tr className="border-b border-border bg-secondary/50">
-                {["Applicant ID", "Applicant", "Latest PD", "Risk Band", "Status", "Runs", "Last Assessed", ""].map(
+                {["Case ID", "Applicant", "Latest PD", "Risk Band", "Status", "Runs", "Last Assessed", ""].map(
                   (h, i) => (
                     <th
                       key={h || i}
@@ -195,7 +195,7 @@ export function HistorySection({
                         )}
                       >
                         <span className={cn("font-mono text-xs", isExpanded ? "text-accent" : "text-muted-foreground")}>
-                          {latest.applicantId}
+                          {latest.caseId}
                         </span>
                       </td>
                       <td className="py-4 px-4">
@@ -248,7 +248,7 @@ export function HistorySection({
                       <tr className="border-b border-border bg-accent/5">
                         <td colSpan={8} className="p-4">
                           <p className="text-sm font-medium text-foreground mb-3">
-                            {runs.length} assessment{runs.length === 1 ? "" : "s"} for {latest.applicantId}
+                            {runs.length} assessment{runs.length === 1 ? "" : "s"} for case {latest.caseId}
                           </p>
                           <div className="space-y-2">
                             {runs.map((run) => (
@@ -316,7 +316,7 @@ export function HistorySection({
         <ApplicantWorkspace
           key={open.id}
           assessment={open}
-          applicant={applicants.find((a) => a.id === open.applicantId)}
+          applicant={applicants.find((a) => a.caseId === open.caseId)}
           onClose={() => onOpen(null)}
           onDecide={onDecide}
         />

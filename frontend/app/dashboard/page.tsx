@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect } from "react";
-import { useUser } from "@clerk/nextjs";
+import { useEffect, useState } from "react";
+import { useAuth, useUser } from "@clerk/react";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { toast } from "sonner";
 import { Sidebar } from "@/components/dashboard/sidebar";
 import { Header } from "@/components/dashboard/header";
 import { OverviewSection } from "@/components/dashboard/sections/overview";
@@ -11,28 +11,33 @@ import { ApplicantsSection } from "@/components/dashboard/sections/applicants";
 import { HistorySection } from "@/components/dashboard/sections/history";
 import { AssistantSection } from "@/components/dashboard/sections/assistant";
 import { SettingsSection } from "@/components/dashboard/sections/settings";
+import { useApi } from "@/lib/api";
 import {
-  applicants as seedApplicants,
-  scoreApplicant,
-  seedAssessments,
+  assessmentFromPrediction,
+  type Applicant,
   type AssessmentRecord,
   type Decision,
 } from "@/lib/underwriting";
 
 export type Section = "overview" | "applicants" | "history" | "assistant" | "settings";
 
-/** How long a simulated model run takes before the applicant flips to Completed. */
-const RUN_MS = 2200;
-
 export default function Dashboard() {
-  const { user, isLoaded } = useUser();
+  const { isLoaded: authLoaded, isSignedIn } = useAuth();
+  const { user, isLoaded: userLoaded } = useUser();
   const router = useRouter();
+  const api = useApi();
 
   useEffect(() => {
-    if (isLoaded && user && !user.unsafeMetadata?.hasOnboarded) {
+    if (authLoaded && !isSignedIn) {
+      router.replace("/login");
+    }
+  }, [authLoaded, isSignedIn, router]);
+
+  useEffect(() => {
+    if (userLoaded && isSignedIn && user && !user.unsafeMetadata?.hasOnboarded) {
       router.replace("/onboarding");
     }
-  }, [isLoaded, user, router]);
+  }, [userLoaded, isSignedIn, user, router]);
 
   const [activeSection, setActiveSection] = useState<Section>("overview");
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -40,22 +45,76 @@ export default function Dashboard() {
   const [searchQuery, setSearchQuery] = useState("");
   const [highlightApplicantId, setHighlightApplicantId] = useState<string | null>(null);
 
-  const [applicants, setApplicants] = useState(seedApplicants);
-  const [assessments, setAssessments] = useState<AssessmentRecord[]>(seedAssessments);
+  const [applicants, setApplicants] = useState<Applicant[]>([]);
+  const [assessments, setAssessments] = useState<AssessmentRecord[]>([]);
+  const [dataError, setDataError] = useState<string | null>(null);
   const [openAssessment, setOpenAssessment] = useState<string | null>(null);
 
-  // Assessments are only ever created here, driven from the Applicants page.
-  function runAssessment(ids: string[]) {
+  useEffect(() => {
+    if (!authLoaded || !userLoaded || !isSignedIn || !user?.unsafeMetadata?.hasOnboarded) return;
+
+    let cancelled = false;
+
+    async function loadData() {
+      try {
+        const [savedAssessments, poolApplications] = await Promise.all([
+          api.getHistory(),
+          api.getApplications()
+        ]);
+        if (cancelled) return;
+
+        setAssessments(savedAssessments);
+        setApplicants(poolApplications);
+        setDataError(null);
+      } catch (e) {
+        if (cancelled) return;
+        const message = e instanceof Error ? e.message : "Unable to load data";
+        setDataError(message);
+      }
+    }
+
+    loadData();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [api, authLoaded, isSignedIn, userLoaded, user?.unsafeMetadata?.hasOnboarded]);
+
+  async function runAssessment(ids: string[]) {
     const targets = applicants.filter((a) => ids.includes(a.id) && a.status !== "Running");
     if (targets.length === 0) return;
 
     const running = new Set(targets.map((a) => a.id));
     setApplicants((prev) => prev.map((a) => (running.has(a.id) ? { ...a, status: "Running" } : a)));
 
-    setTimeout(() => {
-      setAssessments((prev) => [...targets.map(scoreApplicant), ...prev]);
+    try {
+      const predictions = await Promise.all(
+        targets.map(async (applicant) => ({ applicant, prediction: await api.predict(applicant.caseId) }))
+      );
+      const newRecords = await Promise.all(
+        predictions.map(async ({ applicant, prediction }) => {
+          const saved = await api.saveHistory({
+            applicant: {
+              name: applicant.name,
+              income: applicant.income,
+              employment: applicant.employment,
+            },
+            case_id: applicant.caseId,
+            requested_amount: applicant.loan_amount,
+            probability: prediction.probability,
+            risk_band: prediction.risk_band,
+            top_features: prediction.top_features,
+          });
+          return assessmentFromPrediction(prediction, applicant, saved);
+        })
+      );
+      setAssessments((prev) => [...newRecords, ...prev]);
       setApplicants((prev) => prev.map((a) => (running.has(a.id) ? { ...a, status: "Completed" } : a)));
-    }, RUN_MS);
+    } catch (e) {
+      setApplicants((prev) => prev.map((a) => (running.has(a.id) ? { ...a, status: "Not Assessed" } : a)));
+      const message = e instanceof Error ? e.message : "Unable to run prediction";
+      toast.error("Prediction failed", { description: message });
+    }
   }
 
   function openInWorkspace(assessmentId: string) {
@@ -70,6 +129,9 @@ export default function Dashboard() {
 
   function decide(assessmentId: string, decision: Decision) {
     setAssessments((prev) => prev.map((a) => (a.id === assessmentId ? { ...a, decision } : a)));
+    api
+      .saveDecision({ assessment_id: assessmentId, decision: decision.toLowerCase() })
+      .catch((e) => console.error("Failed to save decision", e));
   }
 
   const renderSection = () => {
@@ -119,6 +181,14 @@ export default function Dashboard() {
     }
   };
 
+  if (!authLoaded || !userLoaded) {
+    return null;
+  }
+
+  if (!isSignedIn || !user?.unsafeMetadata?.hasOnboarded) {
+    return null;
+  }
+
   return (
     <div className="flex min-h-screen bg-background relative">
       {/* Grid overlay */}
@@ -143,6 +213,14 @@ export default function Dashboard() {
       >
         <Header activeSection={activeSection} onMenuClick={() => setMobileNavOpen(true)} searchQuery={searchQuery} onSearchChange={setSearchQuery} applicants={applicants} assessments={assessments} onOpenApplicant={openApplicantProfile} onOpenAssessment={openInWorkspace} />
         <main className="flex-1 p-4 sm:p-6 overflow-auto">
+          {dataError && (
+            <div className="mb-4 flex items-center justify-between gap-3 border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+              <span>Unable to load backend data: {dataError}</span>
+              <button type="button" onClick={() => setDataError(null)} className="font-medium hover:opacity-80">
+                Dismiss
+              </button>
+            </div>
+          )}
           <div
             key={activeSection}
             className="animate-in fade-in slide-in-from-bottom-4 duration-500"

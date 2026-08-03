@@ -1,9 +1,10 @@
 "use client";
 
-import { useUser } from "@clerk/nextjs";
+import { useUser } from "@clerk/react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { Loader2 } from "lucide-react";
+import { Loader2, Eye, EyeOff } from "lucide-react";
+import { patchSettings } from "@/lib/settings";
 import { BitmapChevron } from "@/components/landing/bitmap-chevron";
 
 export default function OnboardingPage() {
@@ -14,8 +15,13 @@ export default function OnboardingPage() {
   const [role, setRole] = useState("analyst");
   const [timezone, setTimezone] = useState("utc");
   const [provider, setProvider] = useState("openai/gpt-oss-120b");
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [saving, setSaving] = useState(false);
   const [submitError, setSubmitError] = useState("");
+
+  const needsPassword = isLoaded && !!user && !user.passwordEnabled;
 
   useEffect(() => {
     if (!isLoaded) return;
@@ -31,22 +37,31 @@ export default function OnboardingPage() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!user || saving) return;
+
+    if (needsPassword) {
+      if (password.length < 8) {
+        setSubmitError("Password must be at least 8 characters.");
+        return;
+      }
+      if (password !== confirmPassword) {
+        setSubmitError("Passwords do not match.");
+        return;
+      }
+    }
+
     setSaving(true);
     setSubmitError("");
     try {
+      if (needsPassword) {
+        await user.updatePassword({ newPassword: password });
+      }
+
       await user.update({
         unsafeMetadata: { hasOnboarded: true, firstName, lastName, role, timezone },
       });
       await user.reload();
 
-      const raw = localStorage.getItem("swin_settings");
-      let settings: any = {};
-      if (raw) {
-        try { settings = JSON.parse(raw); } catch {}
-      }
-      if (!settings.aiConfig) settings.aiConfig = {};
-      settings.aiConfig.preferredModel = provider;
-      localStorage.setItem("swin_settings", JSON.stringify(settings));
+      patchSettings({ aiConfig: { preferredModel: provider } });
 
       router.replace("/dashboard");
     } catch (err: any) {
@@ -140,6 +155,53 @@ export default function OnboardingPage() {
             </div>
           </div>
 
+          {needsPassword && (
+            <div className="pt-4 border-t border-border/50">
+              <h3 className="text-sm font-medium text-foreground">Set a password</h3>
+              <p className="mt-1 text-xs text-muted-foreground">
+                You signed up with a social account. Add a password so you can also sign in with your email.
+              </p>
+              <div className="mt-4 grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <label htmlFor="password" className="text-sm font-medium text-foreground">Password</label>
+                  <div className="relative">
+                    <input
+                      id="password"
+                      type={showPassword ? "text" : "password"}
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      required
+                      minLength={8}
+                      autoComplete="new-password"
+                      className="w-full h-9 pl-3 pr-9 bg-secondary border border-border text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring/20 focus:border-accent transition-all duration-200"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      aria-label={showPassword ? "Hide password" : "Show password"}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                    >
+                      {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <label htmlFor="confirmPassword" className="text-sm font-medium text-foreground">Confirm Password</label>
+                  <input
+                    id="confirmPassword"
+                    type={showPassword ? "text" : "password"}
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    required
+                    minLength={8}
+                    autoComplete="new-password"
+                    className="w-full h-9 px-3 bg-secondary border border-border text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring/20 focus:border-accent transition-all duration-200"
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+
           <div className="pt-4 border-t border-border/50">
             <h3 className="text-sm font-medium text-foreground mb-4">AI Configuration (Optional)</h3>
             <div className="space-y-4">
@@ -169,7 +231,7 @@ export default function OnboardingPage() {
 
           <button
             type="submit"
-            disabled={saving || !firstName || !lastName}
+            disabled={saving || !firstName || !lastName || (needsPassword && (!password || !confirmPassword))}
             className="w-full h-10 rounded-lg bg-accent text-accent-foreground font-medium text-sm disabled:opacity-40 hover:opacity-90 transition-opacity duration-200 flex items-center justify-center"
           >
             {saving ? (

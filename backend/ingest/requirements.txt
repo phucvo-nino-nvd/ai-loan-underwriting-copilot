@@ -1,0 +1,5 @@
+boto3>=1.40.8
+langchain-community>=0.3.0
+langchain-openai>=0.3.0
+langchain-text-splitters>=0.3.0
+python-dotenv>=1.0.0

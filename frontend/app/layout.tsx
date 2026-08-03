@@ -1,8 +1,8 @@
 import React from "react"
-import { ClerkProvider } from '@clerk/nextjs'
 import type { Metadata } from 'next'
 import { DM_Sans, JetBrains_Mono } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/next'
+import { ClerkProviderClient } from "@/components/clerk-provider"
 import { ThemeProvider } from "@/components/theme-provider"
 import { Toaster } from "@/components/ui/sonner"
 import './globals.css'
@@ -30,7 +30,7 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <ClerkProvider>
+    <ClerkProviderClient>
       <html lang="en" suppressHydrationWarning>
         <body className={`font-sans antialiased`}>
           <ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false}>
@@ -40,6 +40,6 @@ export default function RootLayout({
           <Analytics />
         </body>
       </html>
-    </ClerkProvider>
+    </ClerkProviderClient>
   )
 }

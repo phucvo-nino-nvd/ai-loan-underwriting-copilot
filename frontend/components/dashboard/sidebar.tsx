@@ -1,10 +1,11 @@
 "use client";
 
 import React, { useState, useRef, useEffect } from "react";
-import { useUser, useClerk } from "@clerk/nextjs";
+import { useUser, useClerk } from "@clerk/react";
 import Link from "next/link";
 
 import { cn } from "@/lib/utils";
+import { loadSettings } from "@/lib/settings";
 import type { Section } from "@/app/dashboard/page";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { BitmapChevron } from "@/components/landing/bitmap-chevron";
@@ -34,17 +35,7 @@ const navItems: { id: Section; label: string; icon: React.ElementType }[] = [
   { id: "settings", label: "Settings", icon: Settings },
 ];
 
-function getCustomAvatar(): string {
-  if (typeof window === "undefined") return "";
-  try {
-    const raw = localStorage.getItem("swin_settings");
-    if (!raw) return "";
-    const data = JSON.parse(raw);
-    return data?.profile?.avatarUrl || "";
-  } catch {
-    return "";
-  }
-}
+const getCustomAvatar = () => loadSettings().profile.avatarUrl;
 
 function UserBadge({ collapsed, onMobileClose, onSectionChange }: { collapsed: boolean; onMobileClose: () => void; onSectionChange: (section: Section) => void }) {
   const { user } = useUser();

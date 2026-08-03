@@ -54,8 +54,8 @@
   --secondary-foreground: oklch(0.95 0 0);
   --muted: oklch(0.18 0.005 260);
   --muted-foreground: oklch(0.65 0 0);
-  --accent: oklch(0.7 0.18 145);
-  --accent-foreground: oklch(0.09 0.005 260);
+  --accent: #25c96c;
+  --accent-foreground: #0a0a0a;
   --destructive: oklch(0.65 0.2 25);
   --destructive-foreground: oklch(0.95 0 0);
   --border: oklch(0.30 0.005 260);
@@ -169,8 +169,8 @@
 
 /* ─── Landing page ─────────────────────────────────── */
 .landing-page {
-  --accent: oklch(0.75 0.2 148);
-  --accent-foreground: oklch(0.08 0 0);
+  --accent: #25c96c;
+  --accent-foreground: #0a0a0a;
 }
 
 /* Noise texture overlay (used by landing) */

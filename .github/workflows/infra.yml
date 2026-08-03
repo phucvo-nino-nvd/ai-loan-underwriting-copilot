@@ -1,0 +1,63 @@
+name: infra
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: What to do
+        type: choice
+        options: [apply, destroy]
+        default: apply
+      phases:
+        description: Phases to run, space separated. destroy runs them back to front.
+        default: 1 2 3 4 5 6
+      seed_database:
+        description: Wipe and reseed the demo data (phase 4, apply only)
+        type: boolean
+        default: false
+
+# One run at a time: two runs writing the same state is how state gets corrupted.
+concurrency: aluci-infra
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      ACTION: ${{ inputs.action }}
+      PHASES: ${{ inputs.phases }}
+      SEED: ${{ inputs.seed_database }}
+      STATE_BUCKET: ${{ vars.STATE_BUCKET }}
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      AWS_REGION: ap-southeast-1
+      DEFAULT_AWS_REGION: ap-southeast-1
+      # Undeclared TF_VAR_* are ignored, so one list covers every phase.
+      TF_VAR_openrouter_api_key: ${{ secrets.OPENROUTER_API_KEY }}
+      TF_VAR_langsmith_api_key: ${{ secrets.LANGSMITH_API_KEY }}
+      TF_VAR_clerk_jwks_url: ${{ secrets.CLERK_JWKS_URL }}
+      TF_VAR_vector_bucket: aluci-vectors
+      TF_VAR_index_name: policy-docs
+      NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.15.8
+          # The wrapper rewrites stdout, which the deploy scripts parse with terraform output -raw.
+          terraform_wrapper: false
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - uses: astral-sh/setup-uv@v5
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - run: bash .github/scripts/phases.sh

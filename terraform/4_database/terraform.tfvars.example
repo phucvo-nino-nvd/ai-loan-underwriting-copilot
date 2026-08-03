@@ -1,0 +1,9 @@
+# Part 4: Database
+# Copy to terraform.tfvars and adjust.
+
+aws_region = "ap-southeast-1"
+
+# Aurora Serverless v2 capacity in ACUs, billed per ACU-hour while the cluster
+# is provisioned. Destroy this phase when you are done experimenting.
+min_capacity = 0.5
+max_capacity = 1.0

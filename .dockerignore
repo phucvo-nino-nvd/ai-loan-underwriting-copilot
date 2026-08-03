@@ -1,0 +1,23 @@
+.git
+.claude
+.venv
+backend/.venv
+backend/database/.venv
+backend/build
+__pycache__
+*.pyc
+.env*
+
+# terraform/ holds 6+ GB of provider binaries under .terraform/, and the api and ingest images
+# build with the repository root as their context — without this every build uploads all of it.
+terraform
+guides
+training
+
+frontend/node_modules
+frontend/out
+frontend/.next
+
+output
+!output/models
+!output/curated/test_data.parquet

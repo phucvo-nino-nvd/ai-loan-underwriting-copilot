@@ -1,10 +1,13 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { useUser, useClerk } from "@clerk/nextjs";
+import { useUser, useClerk, useSession } from "@clerk/react";
 import { useTheme } from "next-themes";
-import { useRouter } from "next/navigation";
 import { toast } from "sonner";
+import { useApi } from "@/lib/api";
+import { formatTime } from "@/lib/underwriting";
+import { loadSettings, saveSettings, STORAGE_KEY, type AppSettings } from "@/lib/settings";
+import type { SessionWithActivitiesResource } from "@clerk/shared/types";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -40,127 +43,150 @@ import {
   Download,
   Trash2,
   Cpu,
-  AlertTriangle,
   Camera,
   Loader2,
   Upload,
   FileText,
 } from "lucide-react";
 
-/* -------------------------------------------------------------------------- */
-/*  Types                                                                      */
-/* -------------------------------------------------------------------------- */
-
-interface ProfileSettings {
-  firstName: string;
-  lastName: string;
-  email: string;
-  role: string;
-  timezone: string;
-  darkMode: boolean;
-  compactView: boolean;
-  avatarUrl: string;
-}
-
-interface AppSettings {
-  profile: ProfileSettings;
-  aiConfig: {
-    preferredModel: string;
-    temperature: number;
-    maxTokens: number;
-  };
-  dataManagement: {
-    retentionDays: number;
-    autoExport: boolean;
-    exportFormat: "csv" | "json";
-  };
-}
-
-/* -------------------------------------------------------------------------- */
-/*  Defaults & helpers                                                         */
-/* -------------------------------------------------------------------------- */
-
-const STORAGE_KEY = "swin_settings";
-
-function defaultSettings(userName?: string, userEmail?: string): AppSettings {
-  return {
-    profile: {
-      firstName: userName?.split(" ")[0] ?? "",
-      lastName: userName?.split(" ").slice(1).join(" ") ?? "",
-      email: userEmail ?? "",
-      role: "manager",
-      timezone: "pst",
-      darkMode: true,
-      compactView: false,
-      avatarUrl: "",
-    },
-    aiConfig: {
-      preferredModel: "openai/gpt-oss-120b",
-      temperature: 0.7,
-      maxTokens: 2048,
-    },
-    dataManagement: {
-      retentionDays: 90,
-      autoExport: false,
-      exportFormat: "csv",
-    },
-  };
-}
-
-function loadSettings(userName?: string, userEmail?: string): AppSettings {
-  if (typeof window === "undefined") return defaultSettings(userName, userEmail);
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) {
-      const parsed = JSON.parse(raw) as AppSettings;
-      // Merge with defaults so new fields are never missing
-      return {
-        ...defaultSettings(userName, userEmail),
-        ...parsed,
-        profile: { ...defaultSettings(userName, userEmail).profile, ...parsed.profile },
-        aiConfig: { ...defaultSettings(userName, userEmail).aiConfig, ...parsed.aiConfig },
-        dataManagement: { ...defaultSettings(userName, userEmail).dataManagement, ...parsed.dataManagement },
-      };
-    }
-  } catch {
-    // corrupted data — reset
-  }
-  return defaultSettings(userName, userEmail);
-}
-
-function saveSettings(settings: AppSettings) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
-}
-
-/* -------------------------------------------------------------------------- */
-/*  Props                                                                      */
-/* -------------------------------------------------------------------------- */
-
 interface SettingsSectionProps {
   sidebarCollapsed: boolean;
   onSidebarCollapsedChange: (collapsed: boolean) => void;
 }
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+/** Clerk puts the readable message in errors[0]; plain Errors only have .message. */
+const clerkError = (err: any, fallback: string): string =>
+  err?.errors?.[0]?.longMessage || err?.message || fallback;
 
-function PolicyUploader() {
-  const [documents, setDocuments] = useState<{ name: string; size: number }[]>([]);
+function download(filename: string, mime: string, content: string) {
+  const url = URL.createObjectURL(new Blob([content], { type: mime }));
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
+function toCsv(rows: Record<string, unknown>[]): string {
+  const columns = Object.keys(rows[0]);
+  const cell = (v: unknown) => `"${String(v ?? "").replace(/"/g, '""')}"`;
+  return [columns.join(","), ...rows.map((r) => columns.map((c) => cell(r[c])).join(","))].join("\n");
+}
+
+function ActiveSessions() {
+  const { user } = useUser();
+  const { session } = useSession();
+  const [sessions, setSessions] = useState<SessionWithActivitiesResource[]>([]);
   const [loading, setLoading] = useState(true);
-  const [uploading, setUploading] = useState(false);
 
-  const fetchDocs = useCallback(async () => {
+  const refresh = useCallback(async () => {
+    if (!user) return;
     try {
-      const res = await fetch(`${API_BASE}/api/rag/documents`);
-      if (res.ok) {
-        const data = await res.json();
-        setDocuments(data.documents);
-      }
-    } catch {
-      // backend offline
+      setSessions(await user.getSessions());
+    } catch (err) {
+      toast.error(clerkError(err, "Could not load active sessions"));
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [user]);
+
+  useEffect(() => {
+    refresh();
+  }, [refresh]);
+
+  const revoke = async (target: SessionWithActivitiesResource) => {
+    try {
+      await target.revoke();
+      toast.success("Session revoked");
+      await refresh();
+    } catch (err) {
+      toast.error(clerkError(err, "Could not revoke session"));
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-8 text-sm text-muted-foreground">
+        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+        Loading sessions…
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      {sessions.map((s) => {
+        const activity = s.latestActivity;
+        const device = activity?.deviceType || activity?.browserName || "Unknown device";
+        const location = [activity?.city, activity?.country].filter(Boolean).join(", ") || "Unknown location";
+        const isCurrent = s.id === session?.id;
+
+        return (
+          <div
+            key={s.id}
+            className="flex items-center justify-between p-3 bg-secondary/30 border border-border animate-in fade-in slide-in-from-left-2"
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-full bg-secondary flex items-center justify-center">
+                <Globe className="w-4 h-4 text-muted-foreground" />
+              </div>
+              <div>
+                <p className="text-sm font-medium text-foreground">
+                  {device}
+                  {isCurrent && (
+                    <Badge className="ml-2 bg-accent/20 text-accent border-accent/30 text-xs">Current</Badge>
+                  )}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {location} &bull; {formatTime(s.lastActiveAt.toISOString())}
+                </p>
+              </div>
+            </div>
+            {!isCurrent && (
+              <Dialog>
+                <DialogTrigger asChild>
+                  <Button variant="outline" size="sm" className="border-destructive/30 text-destructive hover:text-destructive">
+                    Revoke
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="bg-card border-border max-w-sm">
+                  <DialogHeader>
+                    <DialogTitle>Revoke session?</DialogTitle>
+                    <DialogDescription>
+                      This will sign out {device} from {location}.
+                    </DialogDescription>
+                  </DialogHeader>
+                  <DialogFooter className="gap-2">
+                    <Button variant="outline" className="bg-secondary">Cancel</Button>
+                    <Button variant="destructive" onClick={() => revoke(s)}>
+                      Revoke
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function PolicyUploader() {
+  const [documents, setDocuments] = useState<{ id: string; title: string; category?: string }[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [uploading, setUploading] = useState(false);
+  const api = useApi();
+
+  const fetchDocs = useCallback(async () => {
+    try {
+      setDocuments(await api.getPolicyDocuments());
+    } catch (err: any) {
+      toast.error("Could not load policy documents", { description: err.message });
+    } finally {
+      setLoading(false);
+    }
+  }, [api]);
 
   useEffect(() => {
     fetchDocs();
@@ -172,19 +198,7 @@ function PolicyUploader() {
 
     setUploading(true);
     try {
-      const formData = new FormData();
-      formData.append("file", file);
-
-      const res = await fetch(`${API_BASE}/api/rag/upload`, {
-        method: "POST",
-        body: formData,
-      });
-
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.detail ?? "Upload failed");
-      }
-
+      await api.uploadPolicy(file);
       toast.success(`"${file.name}" uploaded and ingested`);
       await fetchDocs();
     } catch (err: any) {
@@ -195,18 +209,10 @@ function PolicyUploader() {
     }
   };
 
-  const handleDelete = async (name: string) => {
+  const handleDelete = async (id: string) => {
     try {
-      const res = await fetch(`${API_BASE}/api/rag/documents/${encodeURIComponent(name)}`, {
-        method: "DELETE",
-      });
-
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.detail ?? "Delete failed");
-      }
-
-      toast.success(`"${name}" deleted`);
+      await api.del(`/api/rag/documents/${encodeURIComponent(id)}`);
+      toast.success("Document deleted");
       await fetchDocs();
     } catch (err: any) {
       toast.error("Delete failed", { description: err.message });
@@ -253,21 +259,23 @@ function PolicyUploader() {
         ) : (
           documents.map((doc) => (
             <div
-              key={doc.name}
+              key={doc.id}
               className="flex items-center justify-between px-4 py-3 hover:bg-secondary/30 transition-colors"
             >
               <div className="flex items-center gap-3 min-w-0">
                 <FileText className="w-4 h-4 text-muted-foreground shrink-0" />
-                <span className="text-sm text-foreground truncate">{doc.name}</span>
-                <span className="text-xs text-muted-foreground shrink-0">
-                  ({(doc.size / 1024).toFixed(1)} KB)
-                </span>
+                <span className="text-sm text-foreground truncate">{doc.title}</span>
+                {doc.category && (
+                  <span className="text-xs text-muted-foreground shrink-0">
+                    {doc.category}
+                  </span>
+                )}
               </div>
               <Button
                 variant="ghost"
                 size="icon"
                 className="shrink-0 text-muted-foreground hover:text-destructive"
-                onClick={() => handleDelete(doc.name)}
+                onClick={() => handleDelete(doc.id)}
               >
                 <Trash2 className="w-4 h-4" />
               </Button>
@@ -290,7 +298,6 @@ export function SettingsSection({
   const { user } = useUser();
   const { signOut } = useClerk();
   const { setTheme } = useTheme();
-  const router = useRouter();
   const firstName = user?.firstName || (user?.unsafeMetadata as any)?.firstName || "";
   const lastName = user?.lastName || (user?.unsafeMetadata as any)?.lastName || "";
   const userName = [firstName, lastName].filter(Boolean).join(" ") || undefined;
@@ -304,11 +311,13 @@ export function SettingsSection({
     loadSettings(userName, userEmail)
   );
   const [activeTab, setActiveTab] = useState("profile");
+  const [passwords, setPasswords] = useState({ current: "", next: "", confirm: "" });
+  const [changingPassword, setChangingPassword] = useState(false);
+  const api = useApi();
 
-  // Persist on every change & notify sidebar
+  // Persist on every change; saveSettings notifies the sidebar.
   useEffect(() => {
     saveSettings(settings);
-    window.dispatchEvent(new StorageEvent("storage", { key: STORAGE_KEY }));
   }, [settings]);
 
   // Auto-delete account after re-authentication flow
@@ -331,7 +340,7 @@ export function SettingsSection({
   /* ---------- helpers ---------- */
 
   const updateProfile = useCallback(
-    (patch: Partial<ProfileSettings>) =>
+    (patch: Partial<AppSettings["profile"]>) =>
       setSettings((s) => ({ ...s, profile: { ...s.profile, ...patch } })),
     []
   );
@@ -342,64 +351,65 @@ export function SettingsSection({
     []
   );
 
-  const updateDataManagement = useCallback(
-    (patch: Partial<AppSettings["dataManagement"]>) =>
-      setSettings((s) => ({
-        ...s,
-        dataManagement: { ...s.dataManagement, ...patch },
-      })),
-    []
-  );
-
   /* ---------- actions ---------- */
 
-  const handleUpdatePassword = () => {
-    const current = (document.getElementById("currentPassword") as HTMLInputElement)
-      ?.value;
-    const newPw = (document.getElementById("newPassword") as HTMLInputElement)
-      ?.value;
-    const confirm = (
-      document.getElementById("confirmPassword") as HTMLInputElement
-    )?.value;
+  const handleUpdatePassword = async () => {
+    const { current, next, confirm } = passwords;
+    if (!current || !next || !confirm) return toast.error("All password fields are required");
+    if (next.length < 8) return toast.error("New password must be at least 8 characters");
+    if (next !== confirm) return toast.error("New passwords do not match");
 
-    if (!current || !newPw || !confirm) {
-      toast.error("All password fields are required");
-      return;
+    setChangingPassword(true);
+    try {
+      await user!.updatePassword({
+        currentPassword: current,
+        newPassword: next,
+        signOutOfOtherSessions: true,
+      });
+      setPasswords({ current: "", next: "", confirm: "" });
+      toast.success("Password updated", { description: "Your other devices have been signed out." });
+    } catch (err) {
+      toast.error("Password update failed", { description: clerkError(err, "Please try again.") });
+    } finally {
+      setChangingPassword(false);
     }
-    if (newPw.length < 8) {
-      toast.error("New password must be at least 8 characters");
-      return;
-    }
-    if (newPw !== confirm) {
-      toast.error("New passwords do not match");
-      return;
-    }
-    toast.promise(
-      new Promise<void>((resolve) => setTimeout(resolve, 1500)),
-      {
-        loading: "Updating password…",
-        success: "Password updated successfully",
-        error: "Password update failed",
-      }
-    );
   };
 
-  const handleRevokeSession = () => {
-    toast.success("Session revoked", {
-      description: "The selected device has been signed out.",
-    });
-  };
+  const handleExportData = async (kind: "assessments" | "applicants", format: "csv" | "json") => {
+    try {
+      const rows: Record<string, unknown>[] =
+        kind === "assessments"
+          ? (await api.getHistory()).map((a) => ({
+              id: a.id,
+              case_id: a.caseId,
+              applicant: a.applicantName,
+              requested_amount: a.requestedAmount ?? "",
+              probability: a.probability,
+              risk_band: a.risk_band,
+              decision: a.decision ?? "",
+              created_at: a.createdAt,
+            }))
+          : (await api.getApplications()).map((a) => ({
+              id: a.id,
+              case_id: a.caseId,
+              name: a.name,
+              income: a.income,
+              loan_amount: a.loan_amount,
+              employment: a.employment,
+              status: a.status,
+            }));
 
-  const handleExportData = (format: "csv" | "json") => {
-    // In a real app this would call the backend to generate a download
-    toast.promise(
-      new Promise<void>((resolve) => setTimeout(resolve, 2000)),
-      {
-        loading: `Generating ${format.toUpperCase()} export…`,
-        success: `${format.toUpperCase()} export ready for download`,
-        error: "Export failed",
-      }
-    );
+      if (rows.length === 0) return toast.info(`No ${kind} to export yet`);
+
+      download(
+        `aluci-${kind}.${format}`,
+        format === "csv" ? "text/csv" : "application/json",
+        format === "csv" ? toCsv(rows) : JSON.stringify(rows, null, 2),
+      );
+      toast.success(`Exported ${rows.length} ${kind} as ${format.toUpperCase()}`);
+    } catch (err: any) {
+      toast.error("Export failed", { description: err.message });
+    }
   };
 
   /* -------------------------------------------------------------------------- */
@@ -706,36 +716,31 @@ export function SettingsSection({
             </CardHeader>
             <CardContent className="space-y-6">
               <div className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="currentPassword">Current Password</Label>
-                  <Input
-                    id="currentPassword"
-                    type="password"
-                    className="bg-secondary border-border focus:border-accent max-w-md"
-                    placeholder="Enter current password"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="newPassword">New Password</Label>
-                  <Input
-                    id="newPassword"
-                    type="password"
-                    className="bg-secondary border-border focus:border-accent max-w-md"
-                    placeholder="At least 8 characters"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="confirmPassword">Confirm New Password</Label>
-                  <Input
-                    id="confirmPassword"
-                    type="password"
-                    className="bg-secondary border-border focus:border-accent max-w-md"
-                    placeholder="Re-enter new password"
-                  />
-                </div>
-                <Button variant="outline" onClick={handleUpdatePassword}>
+                {[
+                  { id: "current" as const, label: "Current Password", placeholder: "Enter current password" },
+                  { id: "next" as const, label: "New Password", placeholder: "At least 8 characters" },
+                  { id: "confirm" as const, label: "Confirm New Password", placeholder: "Re-enter new password" },
+                ].map((field) => (
+                  <div key={field.id} className="space-y-2">
+                    <Label htmlFor={field.id}>{field.label}</Label>
+                    <Input
+                      id={field.id}
+                      type="password"
+                      autoComplete={field.id === "current" ? "current-password" : "new-password"}
+                      value={passwords[field.id]}
+                      onChange={(e) => setPasswords((p) => ({ ...p, [field.id]: e.target.value }))}
+                      className="bg-secondary border-border focus:border-accent max-w-md"
+                      placeholder={field.placeholder}
+                    />
+                  </div>
+                ))}
+                <Button variant="outline" onClick={handleUpdatePassword} disabled={changingPassword}>
+                  {changingPassword && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
                   Update Password
                 </Button>
+                <p className="text-xs text-muted-foreground">
+                  Updating your password signs out every other device.
+                </p>
               </div>
             </CardContent>
           </Card>
@@ -758,10 +763,15 @@ export function SettingsSection({
                     </p>
                   </div>
                 </div>
-                <div className="flex items-center gap-3">
-                  <Badge className="bg-accent/20 text-accent border-accent/30">Enabled</Badge>
-                  <Button variant="outline" size="sm">Manage</Button>
-                </div>
+                <Badge
+                  className={
+                    user?.twoFactorEnabled
+                      ? "bg-success/10 text-success border-success/30"
+                      : "bg-secondary text-muted-foreground border-border"
+                  }
+                >
+                  {user?.twoFactorEnabled ? "Enabled" : "Not enabled"}
+                </Badge>
               </div>
             </CardContent>
           </Card>
@@ -772,60 +782,7 @@ export function SettingsSection({
               <CardDescription>Manage devices where you&apos;re signed in</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="space-y-3">
-                {[
-                  { device: "MacBook Pro", location: "San Francisco, CA", current: true, time: "Now" },
-                  { device: "iPhone 15", location: "San Francisco, CA", current: false, time: "2 hours ago" },
-                  { device: "Chrome on Windows", location: "New York, NY", current: false, time: "1 day ago" },
-                ].map((session) => (
-                  <div
-                    key={session.device}
-                    className="flex items-center justify-between p-3 bg-secondary/30 border border-border animate-in fade-in slide-in-from-left-2"
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-full bg-secondary flex items-center justify-center">
-                        <Globe className="w-4 h-4 text-muted-foreground" />
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium text-foreground">
-                          {session.device}
-                          {session.current && (
-                            <Badge className="ml-2 bg-accent/20 text-accent border-accent/30 text-xs">
-                              Current
-                            </Badge>
-                          )}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          {session.location} &bull; {session.time}
-                        </p>
-                      </div>
-                    </div>
-                    {!session.current && (
-                      <Dialog>
-                        <DialogTrigger asChild>
-                          <Button variant="outline" size="sm" className="border-destructive/30 text-destructive hover:text-destructive">
-                            Revoke
-                          </Button>
-                        </DialogTrigger>
-                        <DialogContent className="bg-card border-border max-w-sm">
-                          <DialogHeader>
-                            <DialogTitle>Revoke session?</DialogTitle>
-                            <DialogDescription>
-                              This will sign out {session.device} from {session.location}.
-                            </DialogDescription>
-                          </DialogHeader>
-                          <DialogFooter className="gap-2">
-                            <Button variant="outline" className="bg-secondary">Cancel</Button>
-                            <Button variant="destructive" onClick={handleRevokeSession}>
-                              Revoke
-                            </Button>
-                          </DialogFooter>
-                        </DialogContent>
-                      </Dialog>
-                    )}
-                  </div>
-                ))}
-              </div>
+              <ActiveSessions />
             </CardContent>
           </Card>
         </TabsContent>
@@ -917,144 +874,38 @@ export function SettingsSection({
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="p-4 border border-border bg-secondary/20 hover:border-accent/50 transition-colors">
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="flex items-center gap-3">
+                {([
+                  { kind: "assessments", title: "Assessments", blurb: "All assessment records" },
+                  { kind: "applicants", title: "Applicants", blurb: "Applicant pipeline data" },
+                ] as const).map((source) => (
+                  <div
+                    key={source.kind}
+                    className="p-4 border border-border bg-secondary/20 hover:border-accent/50 transition-colors"
+                  >
+                    <div className="flex items-center gap-3 mb-3">
                       <div className="w-10 h-10 bg-accent/20 flex items-center justify-center">
                         <Download className="w-5 h-5 text-accent" />
                       </div>
                       <div>
-                        <p className="font-medium text-foreground">Assessments</p>
-                        <p className="text-sm text-muted-foreground">All assessment records</p>
+                        <p className="font-medium text-foreground">{source.title}</p>
+                        <p className="text-sm text-muted-foreground">{source.blurb}</p>
                       </div>
                     </div>
-                  </div>
-                  <div className="flex gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="flex-1 hover:ring-1 hover:ring-accent/50 dark:hover:text-foreground"
-                      onClick={() => handleExportData("csv")}
-                    >
-                      Export CSV
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="flex-1 hover:ring-1 hover:ring-accent/50 dark:hover:text-foreground"
-                      onClick={() => handleExportData("json")}
-                    >
-                      Export JSON
-                    </Button>
-                  </div>
-                </div>
-
-                <div className="p-4 border border-border bg-secondary/20 hover:border-accent/50 transition-colors">
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 bg-accent/20 flex items-center justify-center">
-                        <Download className="w-5 h-5 text-accent" />
-                      </div>
-                      <div>
-                        <p className="font-medium text-foreground">Applicants</p>
-                        <p className="text-sm text-muted-foreground">Applicant pipeline data</p>
-                      </div>
+                    <div className="flex gap-2">
+                      {(["csv", "json"] as const).map((format) => (
+                        <Button
+                          key={format}
+                          variant="outline"
+                          size="sm"
+                          className="flex-1 hover:ring-1 hover:ring-accent/50 dark:hover:text-foreground"
+                          onClick={() => handleExportData(source.kind, format)}
+                        >
+                          Export {format.toUpperCase()}
+                        </Button>
+                      ))}
                     </div>
                   </div>
-                  <div className="flex gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="flex-1 hover:ring-1 hover:ring-accent/50 dark:hover:text-foreground"
-                      onClick={() => handleExportData("csv")}
-                    >
-                      Export CSV
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="flex-1 hover:ring-1 hover:ring-accent/50 dark:hover:text-foreground"
-                      onClick={() => handleExportData("json")}
-                    >
-                      Export JSON
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="border-border bg-card shadow-none">
-            <CardHeader>
-              <CardTitle className="text-base font-medium">Data Retention</CardTitle>
-              <CardDescription>Configure how long assessment data is kept</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="space-y-2">
-                <Label htmlFor="retentionDays">Retention Period</Label>
-                <Select
-                  value={String(settings.dataManagement.retentionDays)}
-                  onValueChange={(v) => updateDataManagement({ retentionDays: Number(v) })}
-                >
-                  <SelectTrigger className="bg-secondary border-border max-w-sm">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="30">30 days</SelectItem>
-                    <SelectItem value="60">60 days</SelectItem>
-                    <SelectItem value="90">90 days</SelectItem>
-                    <SelectItem value="180">180 days</SelectItem>
-                    <SelectItem value="365">1 year</SelectItem>
-                  </SelectContent>
-                </Select>
-                <p className="text-xs text-muted-foreground">
-                  Assessments older than this will be automatically archived.
-                </p>
-              </div>
-
-              <div className="flex items-center justify-between p-4 border border-border bg-secondary/30">
-                <div className="flex items-center gap-3">
-                  <AlertTriangle className="w-5 h-5 text-warning" />
-                  <div>
-                    <p className="font-medium text-foreground">Delete All Data</p>
-                    <p className="text-sm text-muted-foreground">
-                      Permanently remove all underwriting data from this workspace
-                    </p>
-                  </div>
-                </div>
-                <Dialog>
-                  <DialogTrigger asChild>
-                    <Button variant="destructive" size="sm">
-                      <Trash2 className="w-4 h-4 mr-1.5" />
-                      Delete All
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent className="bg-card border-border max-w-sm">
-                    <DialogHeader>
-                      <DialogTitle className="flex items-center gap-2 text-destructive">
-                        <AlertTriangle className="w-5 h-5" />
-                        Irreversible Action
-                      </DialogTitle>
-                      <DialogDescription>
-                        This will permanently delete all applicants, assessments, and
-                        policy data. This action cannot be undone.
-                      </DialogDescription>
-                    </DialogHeader>
-                    <DialogFooter className="gap-2">
-                      <Button variant="outline" className="bg-secondary">Cancel</Button>
-                      <Button
-                        variant="destructive"
-                        onClick={() => {
-                          toast.success("All data has been deleted", {
-                            description: "This is a simulated action. No real data was affected.",
-                          });
-                        }}
-                      >
-                        I understand, delete everything
-                      </Button>
-                    </DialogFooter>
-                  </DialogContent>
-                </Dialog>
+                ))}
               </div>
             </CardContent>
           </Card>

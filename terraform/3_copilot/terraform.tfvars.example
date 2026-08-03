@@ -1,0 +1,17 @@
+# Part 3: Copilot
+# Copy to terraform.tfvars and adjust.
+
+aws_region = "ap-southeast-1"
+
+# Empty for the first apply; backend/copilot/deploy.py fills it on the second.
+copilot_image_uri = ""
+
+openrouter_api_key = "sk-or-v1-..."
+
+# An empty key disables tracing.
+langsmith_api_key = ""
+langsmith_project = "aluci"
+
+# Must match phase 2.
+vector_bucket = "aluci-vectors"
+index_name    = "policy-docs"

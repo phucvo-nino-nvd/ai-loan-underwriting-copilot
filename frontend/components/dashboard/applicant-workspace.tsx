@@ -1,20 +1,18 @@
 "use client";
 
 import { cn } from "@/lib/utils";
-import { AiAssistant } from "@/components/dashboard/ai-assistant";
+import { ChatPane } from "@/components/dashboard/chat-pane";
 import { bandStyle, type Feature } from "@/lib/api";
 import {
   decisionStyle,
   formatMoney,
   formatTime,
-  policies,
   type Applicant,
   type AssessmentRecord,
   type Decision,
 } from "@/lib/underwriting";
 import {
   Activity,
-  BookText,
   Gavel,
   MessageSquare,
   ShieldAlert,
@@ -71,12 +69,6 @@ export function ApplicantWorkspace({
 }) {
   const band = bandStyle[assessment.risk_band];
   const maxShap = Math.max(...assessment.top_features.map((f) => Math.abs(f.shap_value)), 1e-9);
-  const relevant = policies.filter((p) => {
-    if (p.id === "CRD-019") return assessment.risk_band === "HIGH" || assessment.risk_band === "VERY HIGH";
-    if (p.id === "CRD-011") return applicant?.employment === "Self-employed" || applicant?.employment === "Contract";
-    if (p.id === "CRD-004") return applicant ? applicant.loan_amount / applicant.income > 4 : false;
-    return true;
-  });
 
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -102,7 +94,7 @@ export function ApplicantWorkspace({
         <div className="grid grid-cols-2 lg:grid-cols-5 gap-5">
           {[
             { label: "Applicant", value: assessment.applicantName },
-            { label: "Applicant ID", value: assessment.applicantId },
+            { label: "Case ID", value: assessment.caseId },
             { label: "Loan Amount", value: applicant ? formatMoney(applicant.loan_amount) : "—" },
             { label: "Annual Income", value: applicant ? formatMoney(applicant.income) : "—" },
             { label: "Employment", value: applicant?.employment ?? "—" },
@@ -202,30 +194,15 @@ export function ApplicantWorkspace({
         </div>
       </Section>
 
-      {/* 4. Related Policies */}
-      <Section icon={BookText} title="Related Policies" subtitle="Credit policy clauses triggered by this application">
-        <div className="space-y-3">
-          {relevant.map((policy) => (
-            <div
-              key={policy.id}
-              className="p-4 bg-secondary/40 border border-border hover:border-accent/40 transition-colors duration-200"
-            >
-              <div className="flex items-center gap-2">
-                <span className="font-mono text-xs text-accent">{policy.id}</span>
-                <span className="text-sm font-medium text-foreground">{policy.title}</span>
-              </div>
-              <p className="text-sm text-muted-foreground mt-1.5">{policy.body}</p>
-            </div>
-          ))}
-        </div>
-      </Section>
-
       {/* 5. AI Chat — scoped to this assessment */}
       <Section icon={MessageSquare} title="AI Assistant" subtitle={`Ask me to write a report, recommend a decision, or drill into the risk drivers and policy for ${assessment.id}`}>
-        <AiAssistant
+        <ChatPane
+          compact
+          caseId={assessment.caseId}
+          assessmentId={assessment.id}
           greeting={`I've got the assessment for ${assessment.applicantName} (${assessment.id}). I can write an underwriting report, recommend a decision, or answer questions about the risk drivers and policy.`}
           context={
-            `Assessment ${assessment.id} for ${assessment.applicantName} (${assessment.applicantId})\n` +
+            `Assessment ${assessment.id} for ${assessment.applicantName} (case ${assessment.caseId})\n` +
             `Default probability: ${(assessment.probability * 100).toFixed(2)}% (risk band: ${assessment.risk_band})\n\n` +
             `Strongest contributing factors:\n` +
             assessment.top_features
@@ -234,8 +211,8 @@ export function ApplicantWorkspace({
             "\n\n---\n"
           }
           suggestions={[
-            "Write underwriting report",
-            "Recommend decision",
+            { label: "Write underwriting report", kind: "report" },
+            { label: "Recommend decision", kind: "recommend" },
             "Why is the PD this high?",
             "Which factors could be mitigated?",
           ]}
@@ -243,7 +220,7 @@ export function ApplicantWorkspace({
       </Section>
 
       {/* 6. Credit Decision */}
-      <Section icon={Gavel} title="Credit Decision" subtitle="The underwriter of record owns this decision (CRD-023)">
+      <Section icon={Gavel} title="Credit Decision" subtitle="The underwriter of record owns this decision">
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
           {(["Approved", "Declined", "Referred"] as const).map((decision) => (
             <button
