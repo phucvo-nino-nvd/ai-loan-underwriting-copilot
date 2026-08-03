@@ -4,7 +4,38 @@ One workflow, `.github/workflows/infra.yml`, applies or destroys any subset of t
 
 The prerequisite is remote state. A runner is a fresh machine that only has what `git clone` gives it, and `terraform/*/terraform.tfstate` is gitignored. Without shared state a runner's `apply` tries to create resources that already exist, and its `destroy` reports nothing to do while the bill keeps running. Everything in the first section exists to move state into S3 once.
 
-## 1. Create the state bucket
+## 1. Grant the group access to the state bucket
+
+The deploy identity cannot grant itself permissions, so this one comes first and from the Console: IAM → User groups → `AluciAccess` → Add permissions → Create inline policy, named `AluciStatePolicy`.
+
+The bucket does not exist yet, which is why the first statement includes `s3:CreateBucket` — the next step runs as the deploy identity like every other phase. `s3:DeleteObject` covers the lock file Terraform writes next to the state; `s3:ListBucket` is what `terraform init` uses to find an existing state.
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": [
+        "s3:CreateBucket",
+        "s3:ListBucket",
+        "s3:GetBucketVersioning",
+        "s3:PutBucketVersioning",
+        "s3:GetBucketPublicAccessBlock",
+        "s3:PutBucketPublicAccessBlock"
+      ],
+      "Resource": "arn:aws:s3:::aluci-tfstate-<account-id>"
+    },
+    {
+      "Effect": "Allow",
+      "Action": ["s3:GetObject", "s3:PutObject", "s3:DeleteObject"],
+      "Resource": "arn:aws:s3:::aluci-tfstate-<account-id>/*"
+    }
+  ]
+}
+```
+
+## 2. Create the state bucket
 
 Versioning is what lets you roll back a state file someone corrupted. Public access is blocked because state holds ARNs and generated names.
 
@@ -21,35 +52,6 @@ aws s3api put-bucket-versioning \
 aws s3api put-public-access-block \
   --bucket "$STATE_BUCKET" \
   --public-access-block-configuration "BlockPublicAcls=true,IgnorePublicAcls=true,BlockPublicPolicy=true,RestrictPublicBuckets=true"
-```
-
-## 2. Grant the group access to it
-
-Add this as one more inline policy on `AluciAccess`, named `AluciStatePolicy`. `s3:DeleteObject` covers the lock file Terraform writes next to the state; `s3:ListBucket` is what `terraform init` uses to find an existing state.
-
-```json
-{
-  "Version": "2012-10-17",
-  "Statement": [
-    {
-      "Effect": "Allow",
-      "Action": ["s3:ListBucket"],
-      "Resource": "arn:aws:s3:::aluci-tfstate-<account-id>"
-    },
-    {
-      "Effect": "Allow",
-      "Action": ["s3:GetObject", "s3:PutObject", "s3:DeleteObject"],
-      "Resource": "arn:aws:s3:::aluci-tfstate-<account-id>/*"
-    }
-  ]
-}
-```
-
-```bash
-aws iam put-group-policy \
-  --group-name AluciAccess \
-  --policy-name AluciStatePolicy \
-  --policy-document file://policy.json
 ```
 
 ## 3. Move the local state up

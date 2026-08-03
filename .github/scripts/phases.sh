@@ -13,6 +13,12 @@ PHASES="${PHASES:-1 2 3 4 5 6}"
 SEED="${SEED:-false}"
 : "${STATE_BUCKET:?set STATE_BUCKET to the bucket holding the Terraform state}"
 
+# Without this, missing credentials surface as a Terraform backend error about EC2 IMDS.
+if ! aws sts get-caller-identity >/dev/null 2>&1; then
+  echo "AWS credentials are not usable — check the AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY secrets" >&2
+  exit 1
+fi
+
 export TF_IN_AUTOMATION=1
 export TF_VAR_state_bucket="$STATE_BUCKET"
 export TF_VAR_aws_region="${TF_VAR_aws_region:-${AWS_REGION:-ap-southeast-1}}"
