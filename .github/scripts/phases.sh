@@ -13,6 +13,14 @@ PHASES="${PHASES:-1 2 3 4 5 6}"
 SEED="${SEED:-false}"
 : "${STATE_BUCKET:?set STATE_BUCKET to the bucket holding the Terraform state}"
 
+# A secret pasted with a trailing newline signs a request Go refuses to send, and says so as
+# "invalid header field value for Authorization". Neither key can contain whitespace anyway.
+if [ -n "${AWS_ACCESS_KEY_ID:-}" ]; then
+  AWS_ACCESS_KEY_ID="$(printf '%s' "$AWS_ACCESS_KEY_ID" | tr -d '[:space:]')"
+  AWS_SECRET_ACCESS_KEY="$(printf '%s' "${AWS_SECRET_ACCESS_KEY:-}" | tr -d '[:space:]')"
+  export AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY
+fi
+
 # Without this, missing credentials surface as a Terraform backend error about EC2 IMDS.
 if ! aws sts get-caller-identity >/dev/null 2>&1; then
   echo "AWS credentials are not usable — check the AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY secrets" >&2
@@ -80,7 +88,8 @@ export_api_vars() {
   cloudfront_url="$(out 6 cloudfront_url)"
   if [ -n "$cloudfront_url" ]; then
     export TF_VAR_function_url_auth_type=AWS_IAM
-    export TF_VAR_cors_origins="$cloudfront_url"
+    # localhost stays on the list or npm run dev can no longer reach the deployed API.
+    export TF_VAR_cors_origins="$cloudfront_url,http://localhost:3000"
   else
     export TF_VAR_function_url_auth_type=NONE
     export TF_VAR_cors_origins=http://localhost:3000

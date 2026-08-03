@@ -121,6 +121,8 @@ The script is not Actions-specific:
 STATE_BUCKET=$STATE_BUCKET ACTION=apply PHASES="5 6" bash .github/scripts/phases.sh
 ```
 
+One difference worth knowing: `terraform.tfvars` outranks the `TF_VAR_*` values the script exports. A runner has no tfvars, so it uses them; locally your tfvars wins. If a local run does not change something you expected — `function_url_auth_type` and `cors_origins` are the two that matter — that file is why.
+
 ## Troubleshooting
 
 `Backend initialization required` on any local `terraform` command — that directory has no `.terraform` yet. `terraform -chdir=terraform/<phase> init -backend-config="bucket=$STATE_BUCKET"`.
