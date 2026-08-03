@@ -288,7 +288,8 @@ export function AiAssistant({
       </div>
 
       {/* Composer */}
-      <div className="space-y-3 pt-4">
+      {/* pb keeps the input's border off the panel's own bottom border, which stretches to this height. */}
+      <div className="space-y-3 pt-4 pb-4">
         <div className="flex flex-wrap gap-2">
           {suggestions.map((suggestion) => {
             const label = typeof suggestion === "string" ? suggestion : suggestion.label;
