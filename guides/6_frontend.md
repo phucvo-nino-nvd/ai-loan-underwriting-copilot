@@ -20,9 +20,10 @@ graph TB
     CF -->|/api/* behavior<br/>OAC sigv4| APILambda[API Lambda Function URL<br/>aluci-api<br/>AWS_IAM]
 
     APILambda -->|verify X-Clerk-Token| Clerk[Clerk JWKS]
-    APILambda --> Aurora[(Aurora PostgreSQL)]
-    APILambda --> SageMaker[SageMaker Endpoint]
-    APILambda --> Copilot[Copilot Lambda URL]
+    APILambda -->|InvokeEndpoint| SageMaker[SageMaker Endpoint<br/>aluci-classifier-endpoint]
+    APILambda -->|Data API| Aurora[(Aurora PostgreSQL)]
+    APILambda -->|stream report/chat| Copilot[Copilot Lambda URL<br/>aluci-copilot]
+    APILambda -->|async re-index current user| Ingest[Ingest Lambda<br/>aluci-ingest]
 
     Direct[Direct request to<br/>S3 or Lambda URL] -.->|403 Forbidden| S3
     Direct -.->|403 Forbidden| APILambda
@@ -36,7 +37,7 @@ graph TB
 
     class User client
     class CF edge
-    class APILambda,Copilot,SageMaker compute
+    class APILambda,Copilot,SageMaker,Ingest compute
     class S3,Aurora data
     class Clerk auth
     class Direct blocked
