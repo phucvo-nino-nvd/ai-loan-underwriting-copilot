@@ -24,7 +24,8 @@ dist/
 *.egg
 
 # Project generated artifacts
-output/
+output/*
+!output/logs/
 backend/vector_db/
 backend/memory/
 
