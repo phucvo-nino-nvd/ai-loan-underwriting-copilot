@@ -13,7 +13,7 @@ answers with your own credit policy quoted back at you.
 ![LangGraph + MCP](https://img.shields.io/badge/agent-LangGraph%20%2B%20MCP-1c3c3c)
 ![Next.js](https://img.shields.io/badge/Next.js-static%20export-000000?logo=nextdotjs&logoColor=white)
 
-### [Architecture](#architecture) | [Deploy](#deploying) | [Deployment guides](guides/) | [Training notebook](training/main.ipynb)
+### [Architecture](#architecture) | [Deploying](#deploying) | [Deployment guides](guides/) | [Training notebook](training/main.ipynb)
 
 ![Aluci landing and login](assets/login.png)
 
