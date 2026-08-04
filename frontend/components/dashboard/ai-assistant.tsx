@@ -217,7 +217,7 @@ export function AiAssistant({
               <BitmapChevron className="w-10 h-10" />
             </div>
             <h3 className="text-xl font-semibold tracking-tight text-foreground mb-2">
-              Hi{userName ? ` ${userName}` : ""}. I'm aluci.
+              Hi{userName ? ` ${userName}` : ""}. I'm Aluci.
             </h3>
             <p className="text-sm text-muted-foreground max-w-[280px] mx-auto">
               Drop a loan application here and let's analyze it, or ask me anything about the portfolio.
@@ -318,8 +318,8 @@ export function AiAssistant({
             type="text"
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            placeholder="Ask aluci about this loan..."
-            aria-label="Ask aluci about this loan"
+            placeholder="Ask Aluci about this loan..."
+            aria-label="Ask Aluci about this loan"
             className="flex-1 h-9 px-4 bg-secondary border border-border text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring/20 focus:border-accent transition-all duration-200"
           />
           <div className="relative">
