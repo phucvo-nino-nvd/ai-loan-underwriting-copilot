@@ -1,0 +1,7 @@
+model_name,fold,auc,gini
+CatBoost,1,0.831282,0.662563
+CatBoost,2,0.832262,0.664523
+CatBoost,3,0.832342,0.664683
+CatBoost,4,0.830726,0.661451
+CatBoost,5,0.834076,0.668153
+CatBoost,6,0.832115,0.664231
