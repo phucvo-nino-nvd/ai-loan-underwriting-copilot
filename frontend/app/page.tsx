@@ -72,7 +72,7 @@ export default function LandingPage() {
           </Link>
           <div className="flex gap-6 text-[10px] uppercase tracking-widest font-mono text-muted-foreground">
             <Link href="/docs" className="hover:text-foreground transition-colors"><ScrambleTextOnHover text="Docs" /></Link>
-            <Link href="https://github.com/phucvo-nino-nvd/ai-loan-underwriting-copilot" className="hover:text-foreground transition-colors"><ScrambleTextOnHover text="GitHub" /></Link>
+            <Link href="https://github.com/phucvo-nino-nvd/aluci" className="hover:text-foreground transition-colors"><ScrambleTextOnHover text="GitHub" /></Link>
           </div>
         </nav>
 
@@ -106,7 +106,7 @@ export default function LandingPage() {
                 </Link>
                 
                 <Link 
-                  href="https://github.com/phucvo-nino-nvd/ai-loan-underwriting-copilot"
+                  href="https://github.com/phucvo-nino-nvd/aluci"
                   className="font-mono text-xs uppercase tracking-widest text-muted-foreground hover:text-foreground transition-colors duration-200 border border-transparent px-6 py-3"
                 >
                   View on GitHub
