@@ -36,15 +36,24 @@ lender's actual policy documents — in one workspace, fully serverless.
 
 ## Screenshots
 
-| Portfolio overview | Applicants |
-|---|---|
-| ![Portfolio dashboard](assets/dashboard.png) | ![Applicants](assets/applicants.png) |
-| Daily PD trend against risk appetite, risk-band distribution, exposure and recent runs. | The book, with per-applicant PD, status and one-click (re-)assessment. |
-
-| Explainability | Copilot |
-|---|---|
-| ![SHAP explainability](assets/shap.png) | ![Copilot](assets/copilot.png) |
-| SHAP contributions per feature, averaged across folds, next to the values that produced them. | Writes the underwriting report, recommends a decision and cites the policy it used. |
+<table>
+<tr>
+<td width="50%"><img src="assets/dashboard.png" width="100%" alt="Portfolio dashboard" /></td>
+<td width="50%"><img src="assets/applicants.png" width="100%" alt="Applicants" /></td>
+</tr>
+<tr valign="top">
+<td width="50%"><b>Portfolio overview</b> — daily PD trend against risk appetite, risk-band distribution, exposure and recent runs.</td>
+<td width="50%"><b>Applicants</b> — the book, with per-applicant PD, status and one-click (re-)assessment.</td>
+</tr>
+<tr>
+<td width="50%"><img src="assets/shap.png" width="100%" alt="SHAP explainability" /></td>
+<td width="50%"><img src="assets/copilot.png" width="100%" alt="Copilot" /></td>
+</tr>
+<tr valign="top">
+<td width="50%"><b>Explainability</b> — SHAP contributions per feature, averaged across folds, next to the raw values that produced them.</td>
+<td width="50%"><b>Copilot</b> — writes the underwriting report, recommends a decision and cites the policy it used.</td>
+</tr>
+</table>
 
 ## Architecture
 
